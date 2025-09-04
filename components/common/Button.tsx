@@ -7,12 +7,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', isLoading = false, className, ...props }) => {
-  const baseClasses = "inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-300 ease-in-out";
+  const baseClasses = "inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-300 ease-in-out transform hover:-translate-y-0.5 focus:-translate-y-0.5";
   
   const variantClasses = {
     primary: "text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500 disabled:bg-indigo-400",
     secondary: "text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:ring-indigo-500 disabled:bg-indigo-50",
-    danger: "text-red-700 bg-red-100 hover:bg-red-200 focus:ring-red-500 disabled:bg-red-50"
+    danger: "text-white bg-red-600 hover:bg-red-700 focus:ring-red-500 disabled:bg-red-50"
   };
 
   const loadingClasses = isLoading ? "cursor-not-allowed opacity-75" : "";

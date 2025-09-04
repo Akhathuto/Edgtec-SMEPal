@@ -10,16 +10,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+      :root {
+        --brand-indigo-600: #4f46e5;
+        --brand-indigo-700: #4338ca;
+        --brand-slate-100: #f1f5f9;
+        --brand-slate-800: #1e293b;
+      }
       body {
         font-family: 'Inter', sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        background-color: #f8fafc; /* slate-50 */
+        background-color: var(--brand-slate-100);
+        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e2e8f0' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
       }
       /* Custom focus ring for accessibility and style */
       *:focus-visible {
-        outline: 2px solid #4f46e5 !important; /* indigo-600 */
+        outline: 2px solid var(--brand-indigo-600) !important;
         outline-offset: 2px !important;
+        border-radius: 6px;
       }
       /* Custom scrollbar for a more modern look */
       ::-webkit-scrollbar {
@@ -27,7 +35,7 @@
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f5f9; /* slate-100 */
+        background: #e2e8f0; /* slate-200 */
       }
       ::-webkit-scrollbar-thumb {
         background: #cbd5e1; /* slate-300 */
@@ -37,26 +45,37 @@
         background: #94a3b8; /* slate-400 */
       }
 
-      /* Logo Animation Keyframes */
-      @keyframes draw-swoosh {
-        from {
-          stroke-dashoffset: 76;
-        }
-        to {
-          stroke-dashoffset: 0;
-        }
+      /* Global transitions for smoother UI */
+      button, a, input, textarea, select {
+        transition: all 0.2s ease-in-out;
+      }
+      
+      /* Base styles for form elements for consistency */
+      .form-input {
+         display: block;
+         width: 100%;
+         padding: 0.5rem 0.75rem;
+         font-size: 0.875rem;
+         line-height: 1.25rem;
+         color: var(--brand-slate-800);
+         background-color: #fff;
+         border: 1px solid #d1d5db; /* gray-300 */
+         border-radius: 0.5rem;
+         box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      }
+      .form-input:focus {
+          border-color: var(--brand-indigo-600);
+          box-shadow: 0 0 0 1px var(--brand-indigo-600);
+          outline: 2px solid transparent;
+      }
+       .form-input::placeholder {
+          color: #9ca3af; /* gray-400 */
       }
 
-      @keyframes fade-in-scale {
-        from {
-          opacity: 0;
-          transform: scale(0.5);
-        }
-        to {
-          opacity: 1;
-          transform: scale(1);
-        }
-      }
+      /* Logo Animation Keyframes */
+      @keyframes draw-swoosh { from { stroke-dashoffset: 76; } to { stroke-dashoffset: 0; } }
+      @keyframes fade-in-scale { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+      @keyframes fade-in-text { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
 
       /* Logo Animation Classes */
       .logo-swoosh {
@@ -64,11 +83,34 @@
         stroke-dashoffset: 76;
         animation: draw-swoosh 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
       }
-
       .logo-dot {
         opacity: 0;
         transform-origin: center;
         animation: fade-in-scale 0.5s ease-out 0.4s forwards;
+      }
+      .logo-text {
+        opacity: 0;
+        animation: fade-in-text 0.6s ease-out 0.6s forwards;
+      }
+
+      /* Print-specific styles */
+      @media print {
+        body, body * {
+          visibility: hidden;
+        }
+        #invoice-preview-content, #invoice-preview-content * {
+          visibility: visible;
+        }
+        #invoice-preview-content {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
       }
     </style>
   <script type="importmap">
@@ -81,6 +123,9 @@
   }
 }
 </script>
+<!-- PDF Export Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
   <body>
     <div id="root"></div>

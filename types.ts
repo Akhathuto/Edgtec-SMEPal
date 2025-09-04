@@ -1,3 +1,4 @@
+import { Type } from "@google/genai";
 export enum Tool {
   INVOICE = 'Invoice Generator',
   TAX = 'Tax Calculator',
@@ -5,6 +6,9 @@ export enum Tool {
   CONTRACT = 'Contract Assistant',
   CLIENTS = 'Client Management',
   COMPANY_REGISTRATION = 'Company Registration',
+  COMPLIANCE = 'Compliance Assistant',
+  DIRECTOR_VERIFICATION = 'Director Verification',
+  USER_PROFILE = 'User Profile',
   ABOUT = 'About Us',
   CONTACT = 'Contact Us',
   HELP = 'Help & Support',
@@ -21,12 +25,15 @@ export interface InvoiceDetails {
   fromName: string;
   fromAddress: string;
   fromBusinessNumber?: string;
+  fromVatNumber?: string;
   toName: string;
   toAddress: string;
+  toBusinessNumber?: string;
   toVatNumber?: string;
   invoiceNumber: string;
   date: string;
   paymentTerms?: string;
+  paymentLink?: string;
   items: InvoiceItem[];
   notes: string;
   header?: string;
@@ -68,7 +75,13 @@ export interface Director {
   postalAddress: string;
 }
 
+export enum CompanyType {
+  PRIVATE_COMPANY = 'Private Company ((Pty) Ltd)',
+  NON_PROFIT_COMPANY = 'Non-Profit Company (NPC)',
+}
+
 export interface CompanyRegistrationData {
+  companyType: CompanyType;
   names: {
     name1: string;
     name2: string;
@@ -82,5 +95,38 @@ export interface CompanyRegistrationData {
   primaryContact: {
     name: string;
     email: string;
-  }
+  };
+  directorIdDocuments: Record<string, File | null>; // Keyed by director ID
+  businessAddressProof: File | null;
+}
+
+export interface ComplianceGuide {
+  title: string;
+  introduction: string;
+  requiredDocuments: string[];
+  steps: {
+    step: number;
+    instruction: string;
+    details: string;
+  }[];
+  disclaimer: string;
+}
+
+export interface DirectorVerificationResult {
+    status: 'Verified' | 'Attention Required' | 'Invalid';
+    message: string;
+    recommendations: string[];
+    commonIssues: string[];
+    disclaimer: string;
+}
+
+export interface Owner {
+  name: string;
+  percentage: string;
+}
+
+export interface OwnershipData {
+  legalName: string;
+  registrationNumber: string;
+  owners: Owner[];
 }

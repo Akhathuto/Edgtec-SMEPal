@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Tool } from '../types';
+// FIX: Import the Button component.
+import Button from './common/Button';
 
 interface HeaderProps {
   activeTool: Tool;
@@ -14,17 +16,19 @@ const MenuIcon: React.FC = () => (
 
 const Header: React.FC<HeaderProps> = ({ activeTool, onMenuClick }) => {
   return (
-    <header className="flex items-center justify-between p-4 bg-white border-b border-slate-100 h-16">
+    <header className="flex-shrink-0 flex items-center justify-between p-4 bg-white border-b border-slate-200 h-16">
       <button onClick={onMenuClick} className="lg:hidden text-slate-500 hover:text-slate-800">
         <MenuIcon />
       </button>
-      <h1 className="text-xl font-semibold text-slate-800 lg:hidden">{activeTool}</h1>
       <div className="flex-1 flex justify-end items-center space-x-4">
-        <button className="text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg shadow-sm transition-colors">
+        {/* Placeholder for potential future search bar or actions */}
+      </div>
+      <div className="flex items-center space-x-4">
+        <Button variant="primary">
           Go Pro
-        </button>
+        </Button>
         <img
-          className="h-9 w-9 rounded-full object-cover ring-2 ring-offset-2 ring-slate-200"
+          className="h-9 w-9 rounded-full object-cover ring-2 ring-offset-2 ring-indigo-200"
           src="https://picsum.photos/100"
           alt="User avatar"
         />

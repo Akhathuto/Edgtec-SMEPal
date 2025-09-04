@@ -25,7 +25,7 @@ const Logo: React.FC = () => {
                     fill="#4338ca"
                 />
             </svg>
-             <h1 className="text-2xl font-bold text-indigo-600">SME<span className="font-light text-slate-700">Pal</span></h1>
+             <h1 className="text-2xl font-bold text-indigo-600 logo-text">SME<span className="font-light text-slate-700">Pal</span></h1>
         </div>
     );
 };

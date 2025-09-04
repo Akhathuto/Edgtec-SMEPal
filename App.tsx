@@ -11,6 +11,9 @@ import About from './components/About';
 import Contact from './components/Contact';
 import HelpSupport from './components/HelpSupport';
 import CompanyRegistration from './components/CompanyRegistration';
+import UserProfile from './components/UserProfile';
+import ComplianceAssistant from './components/ComplianceAssistant';
+import DirectorVerification from './components/DirectorVerification';
 
 const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<Tool>(Tool.INVOICE);
@@ -30,6 +33,12 @@ const App: React.FC = () => {
         return <ClientManager />;
       case Tool.COMPANY_REGISTRATION:
         return <CompanyRegistration />;
+      case Tool.COMPLIANCE:
+        return <ComplianceAssistant />;
+      case Tool.DIRECTOR_VERIFICATION:
+        return <DirectorVerification />;
+      case Tool.USER_PROFILE:
+        return <UserProfile />;
       case Tool.ABOUT:
         return <About />;
       case Tool.CONTACT:
@@ -42,7 +51,7 @@ const App: React.FC = () => {
   }, [activeTool]);
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
       <Sidebar 
         activeTool={activeTool} 
         onSelectTool={(tool) => {
