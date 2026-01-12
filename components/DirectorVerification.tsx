@@ -93,6 +93,7 @@ const DirectorVerification: React.FC = () => {
                         onChange={e => setName(e.target.value)}
                         placeholder="e.g., Jane Naledi Doe"
                         required
+                        tooltip="Enter the full name exactly as it appears in the South African ID book."
                     />
                     <Input
                         label="South African ID Number"
@@ -102,6 +103,7 @@ const DirectorVerification: React.FC = () => {
                         placeholder="13-digit number"
                         maxLength={13}
                         required
+                        tooltip="The 13-digit identity number. Do not include spaces."
                     />
                     <Button type="submit" isLoading={loading} className="w-full">
                         Verify Details

@@ -54,18 +54,23 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ isOpen, onClose, onSa
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center" onMouseDown={onClose}>
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md m-4" onMouseDown={e => e.stopPropagation()}>
-                <h2 className="text-xl font-semibold mb-4">{clientToEdit ? 'Edit Client' : 'Add New Client'}</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <Input id="name" label="Client Name / Company" value={formData.name} onChange={handleChange} required />
-                    <TextArea id="address" label="Address" value={formData.address} onChange={handleChange} required rows={3} />
-                    <Input id="contactPerson" label="Contact Person (Optional)" value={formData.contactPerson} onChange={handleChange} />
-                    <Input id="email" label="Email (Optional)" type="email" value={formData.email} onChange={handleChange} />
-                    <Input id="phone" label="Phone (Optional)" value={formData.phone} onChange={handleChange} />
-                    <div className="flex justify-end gap-3 pt-4">
-                        <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                        <Button type="submit">Save Client</Button>
+        <div className="fixed inset-0 bg-indigo-600/10 backdrop-blur-md z-[60] flex justify-center items-center p-4 animate-fade-in" onMouseDown={onClose}>
+            <div className="bg-white rounded-[2.5rem] shadow-2xl p-10 w-full max-w-lg animate-scale-in border border-white/50" onMouseDown={e => e.stopPropagation()}>
+                <div className="mb-8">
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">{clientToEdit ? 'Edit Relationship' : 'Onboard Partner'}</h2>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Directory Update Terminal</p>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <Input id="name" label="Legal Entity / Full Name" value={formData.name} onChange={handleChange} required />
+                    <TextArea id="address" label="Official Address" value={formData.address} onChange={handleChange} required rows={3} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                         <Input id="contactPerson" label="Liaison Name" value={formData.contactPerson} onChange={handleChange} />
+                         <Input id="email" label="Contact Email" type="email" value={formData.email} onChange={handleChange} />
+                    </div>
+                    <Input id="phone" label="Secure Contact Line" value={formData.phone} onChange={handleChange} />
+                    <div className="flex justify-end gap-3 pt-6">
+                        <Button type="button" variant="ghost" onClick={onClose} className="!rounded-xl px-6">Cancel</Button>
+                        <Button type="submit" className="!rounded-xl px-8 shadow-xl shadow-indigo-100">Synchronize Data</Button>
                     </div>
                 </form>
             </div>

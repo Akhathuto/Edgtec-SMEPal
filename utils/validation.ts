@@ -41,19 +41,19 @@ export const validateIdNumber = (type: 'SA ID' | 'Passport', number: string): st
 
     // 4. Luhn algorithm checksum
     let sum = 0;
-    for (let i = 0; i < number.length; i++) {
-        let digit = parseInt(number.charAt(i), 10);
-        if (i % 2 === 0) { // odd position (1-indexed)
-             sum += digit;
-        } else { // even position (1-indexed)
-            let evenDigit = digit * 2;
-            if (evenDigit > 9) {
-                evenDigit = Math.floor(evenDigit / 10) + (evenDigit % 10);
-            }
-            sum += evenDigit;
+    let digits = number.split('').map(Number);
+    let checkDigit = digits.pop()!;
+    digits.reverse();
+    
+    let luhnSum = digits.reduce((acc, val, i) => {
+        if (i % 2 === 0) {
+            let doubled = val * 2;
+            return acc + (doubled > 9 ? doubled - 9 : doubled);
         }
-    }
-    if (sum % 10 !== 0) {
+        return acc + val;
+    }, 0);
+
+    if ((luhnSum + checkDigit) % 10 !== 0) {
         return 'Invalid SA ID. Please double-check the number.';
     }
 
@@ -69,3 +69,87 @@ export const validateIdNumber = (type: 'SA ID' | 'Passport', number: string): st
 
   return 'Invalid identification type.';
 };
+
+/**
+ * Validates a credit card number using the Luhn algorithm.
+ */
+const isValidCardNumber = (cardNumber: string): boolean => {
+    const sanitized = cardNumber.replace(/\s/g, '');
+    if (!/^\d{13,19}$/.test(sanitized)) {
+        return false;
+    }
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = sanitized.length - 1; i >= 0; i--) {
+        let digit = parseInt(sanitized.charAt(i), 10);
+        if (shouldDouble) {
+            digit *= 2;
+            if (digit > 9) {
+                digit -= 9;
+            }
+        }
+        sum += digit;
+        shouldDouble = !shouldDouble;
+    }
+    return (sum % 10) === 0;
+};
+
+/**
+ * Validates a credit card expiry date (MM/YY).
+ */
+const isValidExpiryDate = (expiryDate: string): boolean => {
+    const match = expiryDate.match(/^(\d{2})\/(\d{2})$/);
+    if (!match) return false;
+    
+    const month = parseInt(match[1], 10);
+    const year = parseInt(`20${match[2]}`, 10);
+    
+    if (month < 1 || month > 12) return false;
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    if (year < currentYear) return false;
+    if (year === currentYear && month < currentMonth) return false;
+
+    return true;
+};
+
+/**
+ * Validates a CVC number.
+ */
+const isValidCvc = (cvc: string): boolean => {
+    return /^\d{3,4}$/.test(cvc);
+};
+
+export interface PaymentValidationErrors {
+    cardholderName?: string;
+    cardNumber?: string;
+    expiryDate?: string;
+    cvc?: string;
+}
+
+export const validatePaymentDetails = (details: { cardholderName: string; cardNumber: string; expiryDate: string; cvc: string; }): PaymentValidationErrors => {
+    const errors: PaymentValidationErrors = {};
+
+    if (!details.cardholderName.trim()) {
+        errors.cardholderName = "Cardholder name is required.";
+    } else if (details.cardholderName.trim().length < 3) {
+        errors.cardholderName = "Please enter a full name.";
+    }
+    
+    if (!isValidCardNumber(details.cardNumber)) {
+        errors.cardNumber = "Please enter a valid card number.";
+    }
+
+    if (!isValidExpiryDate(details.expiryDate)) {
+        errors.expiryDate = "Please enter a valid future expiry date (MM/YY).";
+    }
+
+    if (!isValidCvc(details.cvc)) {
+        errors.cvc = "Please enter a valid CVC (3 or 4 digits).";
+    }
+    
+    return errors;
+}

@@ -1,20 +1,25 @@
+
 import React from 'react';
 
 interface CardProps {
   children: React.ReactNode;
   className?: string;
   title?: string;
+  delay?: string;
 }
 
-const Card: React.FC<CardProps> = ({ children, className, title }) => {
+const Card: React.FC<CardProps> = ({ children, className, title, delay = "0s" }) => {
   return (
-    <div className={`bg-white shadow-sm rounded-xl overflow-hidden ${className}`}>
+    <div 
+      className={`bg-white card-elevation rounded-2xl overflow-hidden animate-soft-reveal ${className}`}
+      style={{ animationDelay: delay }}
+    >
       {title && (
-        <div className="px-4 py-5 sm:px-6 border-b border-slate-100">
-          <h3 className="text-lg leading-6 font-semibold text-slate-900">{title}</h3>
+        <div className="px-8 py-5 border-b border-slate-50 bg-white/50">
+          <h3 className="text-[13px] font-extrabold text-slate-800 uppercase tracking-wider">{title}</h3>
         </div>
       )}
-      <div className="p-4 sm:p-6">
+      <div className="p-8">
         {children}
       </div>
     </div>

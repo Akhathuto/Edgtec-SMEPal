@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Card from './common/Card';
 import TextArea from './common/TextArea';
@@ -29,48 +28,92 @@ const ContractAssistant: React.FC = () => {
     };
     
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <Card>
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">Contract Assistant</h2>
-                <p className="text-gray-600 mb-6">Describe the agreement you need, and our AI will generate a basic template. This is not legal advice; consult a lawyer for important contracts.</p>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <TextArea
-                        label="Describe the agreement"
-                        id="description"
-                        value={description}
-                        onChange={e => setDescription(e.target.value)}
-                        rows={5}
-                        required
-                    />
-                    <Button type="submit" isLoading={loading} className="w-full">
-                        Generate Contract
-                    </Button>
-                </form>
-            </Card>
+        <div className="max-w-[1600px] mx-auto pb-24 animate-fade-in">
+            <div className="flex flex-col lg:flex-row gap-12 items-start">
+                {/* Drafting Panel */}
+                <div className="w-full lg:w-[450px] space-y-8">
+                    <div>
+                        <h1 className="text-4xl font-black text-slate-800 tracking-tight mb-2">Legal Studio</h1>
+                        <p className="text-sm font-medium text-slate-500 italic">"Draft professional agreements using AI logic."</p>
+                    </div>
 
-            {loading && <Card><div className="text-center text-slate-600 p-8">Drafting your contract...</div></Card>}
-            {error && <Card><div className="text-red-600 bg-red-100 p-4 rounded-md">{error}</div></Card>}
-            
-            {contract && (
-                <Card>
-                    <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">{contract.title}</h2>
-                    <div className="space-y-6 prose prose-slate max-w-none">
-                        {contract.clauses.map((clause, index) => (
-                            <div key={index}>
-                                <h3 className="font-semibold text-gray-700">{index + 1}. {clause.heading}</h3>
-                                <p className="text-gray-600 whitespace-pre-wrap">{clause.body}</p>
+                    <Card className="!rounded-[2.5rem] !p-8 shadow-2xl border-0 bg-white">
+                        <form onSubmit={handleSubmit} className="space-y-8">
+                            <TextArea
+                                label="Agreement Framework"
+                                id="description"
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                rows={8}
+                                required
+                                tooltip="Be specific: Parties involved, deliverables, payment milestones, and termination clauses."
+                            />
+                            <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+                                <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Legal Disclaimer
+                                </p>
+                                <p className="text-[10px] text-indigo-600 font-medium italic leading-relaxed">
+                                    Template generated for information only. Not a substitute for professional legal advice from a qualified attorney.
+                                </p>
                             </div>
-                        ))}
+                            <Button type="submit" isLoading={loading} className="w-full !py-5 shadow-2xl shadow-indigo-100 !rounded-2xl text-base font-black uppercase tracking-widest">
+                                {loading ? 'DRAFTING CLAUSES...' : 'GENERATE DRAFT'}
+                            </Button>
+                            {error && <p className="text-xs font-black text-rose-500 bg-rose-50 p-4 rounded-xl border border-rose-100">{error}</p>}
+                        </form>
+                    </Card>
+                </div>
+
+                {/* Paper Preview */}
+                <div className="flex-1 w-full space-y-8">
+                    <div className="flex justify-between items-center px-4">
+                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Digital Parchment</h3>
+                        {contract && (
+                            <div className="flex gap-3">
+                                <Button variant="ghost" onClick={() => navigator.clipboard.writeText(
+                                    `${contract.title}\n\n${contract.clauses.map((c, i) => `${i + 1}. ${c.heading}\n${c.body}`).join('\n\n')}`
+                                )} className="!py-2 !px-4 text-[10px] font-black uppercase tracking-widest bg-white border border-slate-100 shadow-sm">Copy Text</Button>
+                                <Button className="!py-2 !px-4 text-[10px] font-black uppercase tracking-widest">Print Draft</Button>
+                            </div>
+                        )}
                     </div>
-                     <div className="mt-8 text-center">
-                        <Button variant="secondary" onClick={() => navigator.clipboard.writeText(
-                            `${contract.title}\n\n${contract.clauses.map((c, i) => `${i + 1}. ${c.heading}\n${c.body}`).join('\n\n')}`
-                        )}>
-                            Copy Text
-                        </Button>
+
+                    <div className="bg-slate-200/30 rounded-[3rem] p-6 sm:p-16 shadow-inner min-h-[800px] flex justify-center">
+                        {contract ? (
+                            <div className="w-full max-w-[210mm] bg-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] rounded-lg p-16 animate-scale-in origin-top">
+                                <h2 className="text-3xl font-black text-slate-800 border-b-4 border-indigo-600 pb-6 mb-12 uppercase tracking-tighter">{contract.title}</h2>
+                                <div className="space-y-10">
+                                    {contract.clauses.map((clause, index) => (
+                                        <div key={index} className="space-y-3">
+                                            <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Clause {index + 1}: {clause.heading}</h3>
+                                            <p className="text-sm text-slate-600 leading-relaxed font-medium whitespace-pre-wrap border-l-2 border-slate-100 pl-6 italic">{clause.body}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-24 pt-12 border-t border-slate-100 flex justify-between items-center">
+                                    <div className="space-y-2">
+                                        <div className="h-px w-48 bg-slate-200"></div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Signatory A</p>
+                                    </div>
+                                    <div className="space-y-2 text-right">
+                                        <div className="h-px w-48 bg-slate-200"></div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Signatory B</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center text-slate-400 text-center space-y-4">
+                                <div className="h-24 w-24 rounded-[2rem] bg-white shadow-xl flex items-center justify-center mb-4">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                </div>
+                                <p className="text-lg font-black text-slate-800 tracking-tight">Legal Terminal Idle.</p>
+                                <p className="text-sm font-medium max-w-xs px-10 italic">"Define your contractual scope to generate a high-fidelity legal template."</p>
+                            </div>
+                        )}
                     </div>
-                </Card>
-            )}
+                </div>
+            </div>
         </div>
     );
 };

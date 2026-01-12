@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import type { Client } from '../types';
 
@@ -47,5 +48,10 @@ export const useClients = () => {
         saveClients(updatedClients);
     }, [clients, saveClients]);
 
-    return { clients, addClient, updateClient, deleteClient, isLoading };
+    const deleteClients = useCallback((clientIds: string[]) => {
+        const updatedClients = clients.filter(c => !clientIds.includes(c.id));
+        saveClients(updatedClients);
+    }, [clients, saveClients]);
+
+    return { clients, addClient, updateClient, deleteClient, deleteClients, isLoading };
 };

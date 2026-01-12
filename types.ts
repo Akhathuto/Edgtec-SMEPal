@@ -1,5 +1,7 @@
 import { Type } from "@google/genai";
 export enum Tool {
+  DASHBOARD = 'Dashboard',
+  ADVISOR = 'AI Business Advisor',
   INVOICE = 'Invoice Generator',
   TAX = 'Tax Calculator',
   PAYROLL = 'Payroll Reminders',
@@ -8,7 +10,10 @@ export enum Tool {
   COMPANY_REGISTRATION = 'Company Registration',
   COMPLIANCE = 'Compliance Assistant',
   DIRECTOR_VERIFICATION = 'Director Verification',
+  EXPENSES = 'Receipt Scanner',
+  MARKETING = 'Marketing Assistant',
   USER_PROFILE = 'User Profile',
+  SETTINGS = 'Application Settings',
   ABOUT = 'About Us',
   CONTACT = 'Contact Us',
   HELP = 'Help & Support',
@@ -21,6 +26,8 @@ export interface InvoiceItem {
   unitPrice: number;
 }
 
+export type InvoiceTheme = 'standard' | 'modern' | 'minimal' | 'bold';
+
 export interface InvoiceDetails {
   fromName: string;
   fromAddress: string;
@@ -32,13 +39,16 @@ export interface InvoiceDetails {
   toVatNumber?: string;
   invoiceNumber: string;
   date: string;
+  dueDate?: string;
   paymentTerms?: string;
   paymentLink?: string;
+  bankDetails?: string;
   items: InvoiceItem[];
   notes: string;
   header?: string;
   footer?: string;
   companyLogo?: string;
+  theme?: InvoiceTheme;
 }
 
 export interface TaxCalculationResult {
@@ -73,6 +83,7 @@ export interface Director {
   email: string;
   physicalAddress: string;
   postalAddress: string;
+  shareholding: number;
 }
 
 export enum CompanyType {
@@ -129,4 +140,20 @@ export interface OwnershipData {
   legalName: string;
   registrationNumber: string;
   owners: Owner[];
+}
+
+export interface Expense {
+  id: string;
+  merchant: string;
+  date: string;
+  amount: number;
+  category: string;
+  description?: string;
+}
+
+export interface MarketingContent {
+    platform: string;
+    content: string;
+    hashtags: string[];
+    imageIdea: string;
 }

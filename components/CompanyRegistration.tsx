@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
 import TextArea from './common/TextArea';
 import FileUpload from './common/FileUpload';
+import Tooltip from './common/Tooltip';
 import { suggestCompanyNames } from '../services/geminiService';
 import { CompanyRegistrationData, Director, CompanyType } from '../types';
-import { validateIdNumber } from '../utils/validation';
+import { validateIdNumber, validatePaymentDetails } from '../utils/validation';
+import type { PaymentValidationErrors } from '../utils/validation';
 
 
 const DirectorForm: React.FC<{ director: Director; onUpdate: (director: Director) => void; onRemove: (id: string) => void; index: number }> = ({ director, onUpdate, onRemove, index }) => {
@@ -18,24 +20,49 @@ const DirectorForm: React.FC<{ director: Director; onUpdate: (director: Director
         setIdError(error);
     };
 
-    const handleChange = (field: keyof Omit<Director, 'id'>, value: string) => {
+    const handleChange = (field: keyof Omit<Director, 'id'>, value: string | number) => {
         if (field === 'identificationNumber' || field === 'identificationType') {
             setIdError(null);
         }
         onUpdate({ ...director, [field]: value });
     };
 
+    const copyPhysicalAddress = () => {
+        onUpdate({ ...director, postalAddress: director.physicalAddress });
+    };
+
     return (
-        <div className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-4">
-             <div className="flex justify-between items-center">
-                <h4 className="font-semibold text-gray-800">Director {index + 1}</h4>
-                <Button variant="danger" onClick={() => onRemove(director.id)} className="!py-1 !px-2">Remove</Button>
+        <div className="p-6 border border-slate-100 rounded-[2rem] bg-white shadow-sm space-y-5 relative animate-fade-in-up">
+             <div className="flex justify-between items-center border-b border-slate-50 pb-4 mb-2">
+                <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-black">
+                        {index + 1}
+                    </div>
+                    <h4 className="font-black text-slate-800 tracking-tight">Director Appointment</h4>
+                </div>
+                <Button variant="ghost" onClick={() => onRemove(director.id)} className="!py-1.5 !px-3 text-[10px] uppercase tracking-widest bg-rose-50 text-rose-600 hover:bg-rose-100">Remove</Button>
             </div>
-            <Input label="Full Name" id={`fullName-${director.id}`} value={director.fullName} onChange={e => handleChange('fullName', e.target.value)} required />
-            <div className="grid grid-cols-2 gap-4">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <Input label="Full Name" id={`fullName-${director.id}`} value={director.fullName} onChange={e => handleChange('fullName', e.target.value)} required />
+                 <div>
+                    <Input 
+                        label="Shareholding (%)" 
+                        id={`shareholding-${director.id}`} 
+                        type="number" 
+                        min={0} 
+                        max={100} 
+                        value={director.shareholding} 
+                        onChange={e => handleChange('shareholding', parseFloat(e.target.value) || 0)} 
+                        tooltip="Percentage of the company this director will own. Total must be 100%."
+                    />
+                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label htmlFor={`idType-${director.id}`} className="block text-sm font-medium text-gray-700">ID Type</label>
-                    <select id={`idType-${director.id}`} value={director.identificationType} onChange={e => handleChange('identificationType', e.target.value as 'SA ID' | 'Passport')} onBlur={handleIdBlur} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                    <label htmlFor={`idType-${director.id}`} className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">ID Type</label>
+                    <select id={`idType-${director.id}`} value={director.identificationType} onChange={e => handleChange('identificationType', e.target.value as 'SA ID' | 'Passport')} onBlur={handleIdBlur} className="form-input">
                         <option>SA ID</option>
                         <option>Passport</option>
                     </select>
@@ -45,25 +72,38 @@ const DirectorForm: React.FC<{ director: Director; onUpdate: (director: Director
                     {idError && <p className="mt-1 text-xs text-red-600">{idError}</p>}
                 </div>
             </div>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input label="Email" id={`email-${director.id}`} type="email" value={director.email} onChange={e => handleChange('email', e.target.value)} required />
                 <Input label="Phone Number" id={`phone-${director.id}`} value={director.phone} onChange={e => handleChange('phone', e.target.value)} required />
             </div>
+            
             <TextArea label="Physical Address" id={`physicalAddress-${director.id}`} value={director.physicalAddress} onChange={e => handleChange('physicalAddress', e.target.value)} rows={2} required />
-            <TextArea label="Postal Address" id={`postalAddress-${director.id}`} value={director.postalAddress} onChange={e => handleChange('postalAddress', e.target.value)} rows={2} required />
+            
+            <div className="relative">
+                 <TextArea label="Postal Address" id={`postalAddress-${director.id}`} value={director.postalAddress} onChange={e => handleChange('postalAddress', e.target.value)} rows={2} required />
+                 <div className="absolute top-0 right-0">
+                    <button 
+                        type="button"
+                        onClick={copyPhysicalAddress}
+                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 cursor-pointer uppercase tracking-widest underline"
+                    >
+                        Copy Physical
+                    </button>
+                 </div>
+            </div>
         </div>
     );
 };
 
-const ReviewSection: React.FC<{ title: string; data: { label: string; value?: string }[] }> = ({ title, data }) => (
-    <div className="mt-6">
-        <h3 className="text-lg font-medium text-gray-900 border-b pb-2">{title}</h3>
-        <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+const ReviewSection: React.FC<{ title: string; data: { label: string; value?: string | number }[] }> = ({ title, data }) => (
+    <div className="mt-8">
+        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-3 mb-6">{title}</h3>
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 bg-slate-50/50 p-6 rounded-3xl">
             {data.map(({ label, value }) => (
-                value ? (
+                value !== undefined && value !== '' ? (
                     <div key={label} className="sm:col-span-1">
-                        <dt className="text-sm font-medium text-gray-500">{label}</dt>
-                        <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{value}</dd>
+                        <dt className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</dt>
+                        <dd className="text-sm font-bold text-slate-800 whitespace-pre-wrap">{value}</dd>
                     </div>
                 ) : null
             ))}
@@ -71,16 +111,16 @@ const ReviewSection: React.FC<{ title: string; data: { label: string; value?: st
     </div>
 );
 
-const CompanyTypeCard: React.FC<{ type: string; description: string; onSelect: () => void; icon: JSX.Element }> = ({ type, description, onSelect, icon }) => (
-    <div onClick={onSelect} className="group relative block cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md hover:border-indigo-500 hover:shadow-lg transition-all duration-300 ease-in-out">
-        <div className="absolute right-4 top-4 rounded-lg bg-white p-1 ring-1 ring-indigo-500 opacity-0 transition-opacity group-hover:opacity-100">
-             <svg className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+const CompanyTypeCard: React.FC<{ type: string; description: string; onSelect: () => void; icon: React.ReactElement }> = ({ type, description, onSelect, icon }) => (
+    <div onClick={onSelect} className="group relative block cursor-pointer rounded-[2.5rem] border border-gray-100 bg-white p-10 shadow-lg hover:border-indigo-500 hover:shadow-2xl transition-all duration-500 ease-in-out text-left h-full">
+        <div className="absolute right-8 top-8 rounded-full bg-indigo-50 p-2 opacity-0 transition-opacity group-hover:opacity-100 group-hover:scale-110 duration-300">
+             <svg className="h-6 w-6 text-indigo-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
         </div>
-        <div className="flex items-center space-x-4">
-            <div className="flex-shrink-0 text-indigo-600">{icon}</div>
+        <div className="flex flex-col h-full">
+            <div className="flex-shrink-0 mb-8 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">{icon}</div>
             <div>
-                <h3 className="font-semibold text-gray-800">{type}</h3>
-                <p className="mt-1 text-sm text-gray-500">{description}</p>
+                <h3 className="font-black text-2xl text-slate-900 tracking-tight mb-4">{type}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed font-medium">{description}</p>
             </div>
         </div>
     </div>
@@ -98,9 +138,10 @@ const initialFormData: CompanyRegistrationData = {
     businessAddressProof: null,
 };
 
+const STORAGE_KEY = 'sme-pal-company-reg-progress';
 
 const CompanyRegistration: React.FC = () => {
-    const [step, setStep] = useState(0); // 0 for type selection
+    const [step, setStep] = useState(0); 
     const [nameSuggestionDescription, setNameSuggestionDescription] = useState('An online store selling handmade leather goods in South Africa');
     const [suggestedNames, setSuggestedNames] = useState<string[]>([]);
     const [isSuggesting, setIsSuggesting] = useState(false);
@@ -109,18 +150,53 @@ const CompanyRegistration: React.FC = () => {
     const [formData, setFormData] = useState<CompanyRegistrationData>(initialFormData);
 
     const [paymentDetails, setPaymentDetails] = useState({ cardholderName: '', cardNumber: '', expiryDate: '', cvc: '' });
+    const [paymentErrors, setPaymentErrors] = useState<PaymentValidationErrors>({});
     const [isPaying, setIsPaying] = useState(false);
+    const [transactionId, setTransactionId] = useState('');
+
+
+    useEffect(() => {
+        try {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                const parsed = JSON.parse(savedData);
+                setFormData(prev => ({
+                    ...prev,
+                    ...parsed.formData,
+                    directorIdDocuments: {},
+                    businessAddressProof: null
+                }));
+                if (parsed.step < 8) {
+                    setStep(parsed.step);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load saved registration progress", e);
+        }
+    }, []);
+
+    useEffect(() => {
+        const dataToSave = {
+            step,
+            formData: {
+                ...formData,
+                directorIdDocuments: {},
+                businessAddressProof: null
+            }
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    }, [step, formData]);
 
 
     const steps = useMemo(() => [
-        { id: 1, name: 'Company Names' },
-        { id: 2, name: 'Business Details' },
-        { id: 3, name: 'Directors' },
-        { id: 4, name: 'Documents' },
-        { id: 5, name: 'Primary Contact' },
-        { id: 6, name: 'Review' },
-        { id: 7, name: 'Payment' },
-        { id: 8, name: 'Complete' }
+        { id: 1, name: 'Proposed Names' },
+        { id: 2, name: 'Physical Presence' },
+        { id: 3, name: 'Structure & Control' },
+        { id: 4, name: 'Compliance Docs' },
+        { id: 5, name: 'Primary Liaison' },
+        { id: 6, name: 'Audit Review' },
+        { id: 7, name: 'Final Payment' },
+        { id: 8, name: 'Submission Successful' }
     ], []);
     const totalSteps = steps.length;
 
@@ -130,8 +206,12 @@ const CompanyRegistration: React.FC = () => {
     };
     
     const resetWizard = () => {
-        setFormData(initialFormData);
-        setStep(0);
+        if (window.confirm("This will clear all registration progress. Are you sure?")) {
+            localStorage.removeItem(STORAGE_KEY);
+            setFormData(initialFormData);
+            setStep(0);
+            setTransactionId('');
+        }
     }
 
     const handleNameSuggestion = async () => {
@@ -168,6 +248,7 @@ const CompanyRegistration: React.FC = () => {
             email: '',
             physicalAddress: '',
             postalAddress: '',
+            shareholding: 0,
         };
         setFormData(prev => ({ ...prev, directors: [...prev.directors, newDirector] }));
     };
@@ -199,12 +280,15 @@ const CompanyRegistration: React.FC = () => {
         else if (!names.name2) newNames.name2 = name;
         else if (!names.name3) newNames.name3 = name;
         else if (!names.name4) newNames.name4 = name;
-        else newNames.name4 = name; // Overwrite last one if all are full
+        else newNames.name4 = name;
         setFormData(prev => ({ ...prev, names: newNames }));
     };
     
+    const copyBusinessAddress = () => {
+        setFormData(prev => ({ ...prev, businessPostalAddress: prev.businessPhysicalAddress }));
+    };
+
     const nextStep = () => {
-        // Validation before proceeding
         if (step === 1 && !formData.names.name1) {
             alert('Please provide at least one proposed company name.');
             return;
@@ -213,9 +297,23 @@ const CompanyRegistration: React.FC = () => {
             alert('Please provide both physical and postal business addresses.');
             return;
         }
-        if (step === 3 && formData.directors.length === 0) {
-            alert('You must add at least one director.');
-            return;
+        if (step === 3) {
+            if (formData.directors.length === 0) {
+                alert('You must add at least one director.');
+                return;
+            }
+            if (formData.companyType === CompanyType.NON_PROFIT_COMPANY && formData.directors.length < 3) {
+                alert('A Non-Profit Company (NPC) must have at least 3 directors by law.');
+                return;
+            }
+            if (formData.companyType === CompanyType.PRIVATE_COMPANY) {
+                const totalShareholding = formData.directors.reduce((sum, d) => sum + d.shareholding, 0);
+                if (Math.abs(totalShareholding - 100) > 0.1) {
+                    if (!window.confirm(`Total shareholding is ${totalShareholding}%. It should ideally be 100%. Do you want to verify this later?`)) {
+                        return;
+                    }
+                }
+            }
         }
         if (step === 4) {
             const allDocsUploaded = formData.directors.every(dir => !!formData.directorIdDocuments[dir.id]);
@@ -240,13 +338,11 @@ const CompanyRegistration: React.FC = () => {
             const error = validateIdNumber(director.identificationType, director.identificationNumber);
             if (error) {
                 alert(`Error for Director ${director.fullName || ' '}: ${error}`);
-                setStep(3); // Go back to director step
+                setStep(3);
                 return;
             }
         }
-
-        console.log('Company Registration Data:', formData);
-        // This is where you would send the data to a server in a real application.
+        console.log('Company Registration Data Submitted.');
     };
     
     const handlePaymentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,136 +359,278 @@ const CompanyRegistration: React.FC = () => {
             }
         }
         if (id === 'cvc') {
-            formattedValue = value.replace(/[^\d]/g, '').slice(0, 3);
+            formattedValue = value.replace(/[^\d]/g, '').slice(0, 4);
         }
         setPaymentDetails(prev => ({ ...prev, [id]: formattedValue }));
     };
 
     const handlePaymentSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setPaymentErrors({});
+        const errors = validatePaymentDetails(paymentDetails);
+        if (Object.keys(errors).length > 0) {
+            setPaymentErrors(errors);
+            return;
+        }
         setIsPaying(true);
-        // Simulate API call to payment gateway
         await new Promise(resolve => setTimeout(resolve, 2500));
-        
-        console.log('Payment successful. Submitting registration data...');
         submitRegistrationData();
-        
+        localStorage.removeItem(STORAGE_KEY);
+        setTransactionId(`TXN-${crypto.randomUUID().split('-')[0].toUpperCase()}`);
         setIsPaying(false);
-        setStep(8); // Go to the final "Complete" step
+        setStep(8);
     };
 
 
     if (step === 0) {
         return (
-            <div className="max-w-4xl mx-auto space-y-6 text-center">
-                <h1 className="text-2xl font-bold text-slate-800">Company Registration</h1>
-                <p className="text-slate-600">First, let's choose the type of company you want to register.</p>
-                <div className="space-y-4 pt-4 text-left">
+            <div className="max-w-6xl mx-auto space-y-12 pb-24 text-left animate-fade-in">
+                <div className="text-center space-y-6 pt-12">
+                    <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-black tracking-[0.2em] uppercase mb-2">
+                        Official Service Portal
+                    </div>
+                    <h1 className="text-5xl sm:text-6xl font-black text-slate-900 tracking-tighter leading-none">
+                        Launch Your <span className="text-indigo-600 underline decoration-indigo-100 underline-offset-8">Vision</span> Properly.
+                    </h1>
+                    <p className="text-xl text-slate-500 max-w-3xl mx-auto font-medium leading-relaxed italic">
+                        "SMEPal handles your CIPC registration from start to finish. Precision, compliance, and speed."
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     <CompanyTypeCard
                         type={CompanyType.PRIVATE_COMPANY}
-                        description="A for-profit company, the most common type for businesses in South Africa."
+                        description="Most common for-profit structure. Owned by shareholders, managed by directors. Ideal for startups and small businesses looking to grow."
                         onSelect={() => handleSelectCompanyType(CompanyType.PRIVATE_COMPANY)}
-                        icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+                        icon={<div className="bg-indigo-600 text-white p-5 rounded-[1.5rem] shadow-xl shadow-indigo-100"><svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg></div>}
                     />
                     <CompanyTypeCard
                         type={CompanyType.NON_PROFIT_COMPANY}
-                        description="For non-profit organisations (NPOs) established for public benefit or social objectives."
+                        description="Formed for public benefit. No shareholders; assets must be used for social objectives. Requires minimum 3 directors and a formal MOI."
                         onSelect={() => handleSelectCompanyType(CompanyType.NON_PROFIT_COMPANY)}
-                        icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21v-2a6 6 0 00-12 0v2" /></svg>}
+                        icon={<div className="bg-emerald-600 text-white p-5 rounded-[1.5rem] shadow-xl shadow-emerald-100"><svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21v-2a6 6 0 00-12 0v2" /></svg></div>}
                     />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    <div className="lg:col-span-2 space-y-10">
+                        <Card title="Legal Compliance Architecture" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+                                <div className="space-y-3">
+                                    <h4 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-widest text-xs">
+                                        <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+                                        Certified ID/Passport
+                                    </h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed font-medium">IDs must be certified by a Commissioner of Oaths within 3 months. NPCs require 3 distinct IDs.</p>
+                                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tight">Anti-Fraud Verification</p>
+                                </div>
+                                <div className="space-y-3">
+                                    <h4 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-widest text-xs">
+                                        <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+                                        Physical Address
+                                    </h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed font-medium">A physical address in SA where legal process can be served. FICA requires a utility bill.</p>
+                                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tight">FICA Compliance</p>
+                                </div>
+                                <div className="space-y-3">
+                                    <h4 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-widest text-xs">
+                                        <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+                                        MOI (Constitution)
+                                    </h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed font-medium">The rules of governance. We use the official CIPC standard template for maximum safety.</p>
+                                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tight">Companies Act (2008)</p>
+                                </div>
+                                <div className="space-y-3">
+                                    <h4 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-widest text-xs">
+                                        <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+                                        Registration Fee
+                                    </h4>
+                                    <p className="text-sm text-slate-500 leading-relaxed font-medium">Full handling of CIPC disbursements and name reservation for R499 once-off.</p>
+                                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tight">Comprehensive Service</p>
+                                </div>
+                            </div>
+                        </Card>
+
+                        <div className="bg-indigo-700 text-white rounded-[3rem] p-12 flex flex-col md:flex-row items-center justify-between gap-10 shadow-3xl relative overflow-hidden group">
+                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                            <div className="text-left space-y-4 relative z-10">
+                                <h3 className="text-3xl font-black tracking-tight leading-none">Registration Timeline.</h3>
+                                <p className="text-indigo-100 text-sm font-medium leading-relaxed max-w-sm">Most registrations are completed within 3 to 5 business days, depending on system load.</p>
+                            </div>
+                            <div className="flex gap-8 relative z-10">
+                                <div className="text-center">
+                                    <div className="text-3xl font-black">D1</div>
+                                    <div className="text-[10px] font-black uppercase text-indigo-300 tracking-widest">Submit</div>
+                                </div>
+                                <div className="h-10 w-px bg-white/20"></div>
+                                <div className="text-center">
+                                    <div className="text-3xl font-black">D3</div>
+                                    <div className="text-[10px] font-black uppercase text-indigo-300 tracking-widest">Process</div>
+                                </div>
+                                <div className="h-10 w-px bg-white/20"></div>
+                                <div className="text-center">
+                                    <div className="text-3xl font-black text-emerald-400">D5</div>
+                                    <div className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Certify</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-10">
+                        <Card title="Operational Roadmap" className="!rounded-[3rem] shadow-xl border-0 !p-10">
+                            <ul className="space-y-10 text-left">
+                                <li className="flex gap-6 group">
+                                    <div className="h-10 w-10 rounded-2xl bg-indigo-50 flex items-center justify-center font-black text-indigo-600 flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300">1</div>
+                                    <div>
+                                        <h5 className="font-black text-slate-800 text-sm uppercase tracking-tight">Income Tax Reg</h5>
+                                        <p className="text-xs text-slate-400 mt-2 font-medium leading-relaxed">SARS automatically registers your new entity for income tax upon CIPC approval.</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-6 group">
+                                    <div className="h-10 w-10 rounded-2xl bg-indigo-50 flex items-center justify-center font-black text-indigo-600 flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300">2</div>
+                                    <div>
+                                        <h5 className="font-black text-slate-800 text-sm uppercase tracking-tight">Business Banking</h5>
+                                        <p className="text-xs text-slate-400 mt-2 font-medium leading-relaxed">Use your Cor14.3 certificate to open a formal account at any major South African bank.</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-6 group">
+                                    <div className="h-10 w-10 rounded-2xl bg-indigo-50 flex items-center justify-center font-black text-indigo-600 flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300">3</div>
+                                    <div>
+                                        <h5 className="font-black text-slate-800 text-sm uppercase tracking-tight">B-BBEE Affidavit</h5>
+                                        <p className="text-xs text-slate-400 mt-2 font-medium leading-relaxed">New SMEs qualify for a Level 1 B-BBEE affidavit as an EME automatically.</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </Card>
+
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-10 text-left shadow-inner">
+                             <h4 className="font-black text-indigo-900 text-xs uppercase tracking-widest mb-4">Director Eligibility Notice</h4>
+                             <p className="text-xs text-indigo-700 leading-relaxed font-medium">Directors must be at least 18 years old, not currently declared insolvent, and not prohibited from holding office by a court order.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <div className="text-center">
-                 <h1 className="text-2xl font-bold text-slate-800">Company Registration Wizard</h1>
-                 <p className="text-slate-600">Registering a: <span className="font-semibold text-indigo-600">{formData.companyType}</span></p>
+        <div className="max-w-4xl mx-auto space-y-10 pb-24 animate-fade-in">
+            <div className="text-center space-y-2">
+                 <h1 className="text-4xl font-black text-slate-900 tracking-tight">Registration Wizard</h1>
+                 <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Active Session: <span className="text-indigo-600">{formData.companyType}</span></p>
             </div>
             
-            <div className="border border-gray-200 rounded-xl p-4 sm:p-6 bg-white shadow-sm">
+            <div className="bg-white/80 backdrop-blur-md border border-slate-100 rounded-[2.5rem] p-8 sm:p-10 shadow-xl overflow-hidden">
                 <nav aria-label="Progress">
-                    <ol role="list" className="flex items-center">
+                    <ol role="list" className="flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide pb-4">
                         {steps.map((s, index) => (
-                            <li key={s.name} className={`relative ${index !== steps.length - 1 ? 'pr-8 sm:pr-20' : ''} flex-1`}>
+                            <li key={s.name} className="flex-shrink-0 flex flex-col items-center gap-3">
                                 {step > s.id ? (
-                                    <>
-                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                            <div className="h-0.5 w-full bg-indigo-600" />
-                                        </div>
-                                        <button onClick={() => setStep(s.id)} className="relative flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-900">
-                                            <svg className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.052-.143z" clipRule="evenodd" /></svg>
-                                            <span className="sr-only">{s.name}</span>
-                                        </button>
-                                    </>
+                                    <button onClick={() => setStep(s.id)} className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.052-.143z" clipRule="evenodd" /></svg>
+                                    </button>
                                 ) : step === s.id ? (
-                                    <>
-                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                            <div className="h-0.5 w-full bg-gray-200" />
-                                        </div>
-                                        <div className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-indigo-600 bg-white" aria-current="step">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" aria-hidden="true" />
-                                            <span className="sr-only">{s.name}</span>
-                                        </div>
-                                    </>
+                                    <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-indigo-600 bg-white ring-4 ring-indigo-50" aria-current="step">
+                                        <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
+                                    </div>
                                 ) : (
-                                    <>
-                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                            <div className="h-0.5 w-full bg-gray-200" />
-                                        </div>
-                                        <div className="group relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300 bg-white hover:border-gray-400">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-transparent group-hover:bg-gray-300" aria-hidden="true" />
-                                            <span className="sr-only">{s.name}</span>
-                                        </div>
-                                    </>
+                                    <div className="group relative flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-slate-100 bg-slate-50/50">
+                                        <span className="text-[10px] font-black text-slate-300">{s.id}</span>
+                                    </div>
                                 )}
-                                <div className="absolute -bottom-6 text-xs text-center w-20 -left-6 sm:w-auto sm:left-auto">{s.name}</div>
+                                <span className={`text-[9px] font-black uppercase tracking-widest text-center whitespace-nowrap ${step === s.id ? 'text-indigo-600' : 'text-slate-400 opacity-60'}`}>{s.name}</span>
                             </li>
                         ))}
                     </ol>
                 </nav>
             </div>
             
-            <div>
+            <div className="space-y-10">
                 {step === 1 && (
-                    <div className="space-y-6">
-                        <Card title="Step 1: Get Company Name Suggestions (Optional)">
-                            <div className="space-y-4">
-                                <TextArea label="Describe your business" id="businessDescription" value={nameSuggestionDescription} onChange={e => setNameSuggestionDescription(e.target.value)} rows={3} />
-                                <Button type="button" onClick={handleNameSuggestion} isLoading={isSuggesting} className="w-full">Suggest Names</Button>
-                                {suggestionError && <p className="text-red-500 text-sm">{suggestionError}</p>}
-                                {suggestedNames.length > 0 && (
-                                    <div className="pt-4"><h4 className="font-semibold text-gray-800 mb-2">Suggestions:</h4><div className="flex flex-wrap gap-2">{suggestedNames.map(name => (<button key={name} type="button" onClick={() => handleUseSuggestedName(name)} className="bg-indigo-100 text-indigo-700 text-sm font-medium px-3 py-1 rounded-full hover:bg-indigo-200 transition-colors" title={`Use "${name}" in form`}>{name}</button>))}</div></div>
-                                )}
-                            </div>
-                        </Card>
-                        <Card title="Proposed Company Names">
-                             <p className="text-sm text-gray-600 mb-4">Provide up to 4 names in order of preference.</p>
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <Input label="Name 1 (Highest Preference)" id="name1" value={formData.names.name1} onChange={e => handleNestedFormChange('names', 'name1', e.target.value)} required />
-                                <Input label="Name 2" id="name2" value={formData.names.name2} onChange={e => handleNestedFormChange('names', 'name2', e.target.value)} />
-                                <Input label="Name 3" id="name3" value={formData.names.name3} onChange={e => handleNestedFormChange('names', 'name3', e.target.value)} />
-                                <Input label="Name 4" id="name4" value={formData.names.name4} onChange={e => handleNestedFormChange('names', 'name4', e.target.value)} />
+                    <div className="space-y-10">
+                        <Card title="Proposed Company Names" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                             <p className="text-sm font-medium text-slate-500 mb-8 text-left italic">"Provide up to 4 names in order of preference for the CIPC reservation queue."</p>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                                <Input label="Primary Name" id="name1" value={formData.names.name1} onChange={e => handleNestedFormChange('names', 'name1', e.target.value)} required />
+                                <Input label="Alternative 1" id="name2" value={formData.names.name2} onChange={e => handleNestedFormChange('names', 'name2', e.target.value)} />
+                                <Input label="Alternative 2" id="name3" value={formData.names.name3} onChange={e => handleNestedFormChange('names', 'name3', e.target.value)} />
+                                <Input label="Alternative 3" id="name4" value={formData.names.name4} onChange={e => handleNestedFormChange('names', 'name4', e.target.value)} />
                              </div>
                         </Card>
+
+                        <div className="bg-indigo-700 p-12 rounded-[3.5rem] text-white shadow-3xl relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                            <div className="relative z-10 flex flex-col md:flex-row gap-10 items-center">
+                                <div className="flex-1 text-left space-y-4">
+                                    <h3 className="text-3xl font-black tracking-tight leading-none">Need Inspiration?</h3>
+                                    <p className="text-indigo-100 text-sm font-medium leading-relaxed max-w-sm">Describe your mission and let the SMEPal Engine suggest unique, available options.</p>
+                                    <div className="flex flex-col gap-4 mt-6">
+                                        <textarea 
+                                            value={nameSuggestionDescription} 
+                                            onChange={e => setNameSuggestionDescription(e.target.value)} 
+                                            className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-sm font-medium placeholder:text-indigo-300 focus:bg-white/20 focus:outline-none transition-all"
+                                            rows={2}
+                                        />
+                                        <Button type="button" onClick={handleNameSuggestion} isLoading={isSuggesting} className="!bg-white !text-indigo-700 hover:!bg-indigo-50 !py-4 shadow-xl">Inject Creative DNA</Button>
+                                    </div>
+                                    {suggestionError && <p className="text-rose-300 text-xs font-bold">{suggestionError}</p>}
+                                </div>
+                                <div className="w-full md:w-64 flex flex-col gap-3">
+                                    {suggestedNames.length > 0 ? (
+                                        <div className="space-y-2 animate-fade-in">
+                                            {suggestedNames.map(name => (
+                                                <button 
+                                                    key={name} 
+                                                    type="button" 
+                                                    onClick={() => handleUseSuggestedName(name)} 
+                                                    className="w-full bg-white/5 hover:bg-white/20 border border-white/10 p-3 rounded-xl text-xs font-black uppercase tracking-widest text-left transition-all"
+                                                >
+                                                    + {name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="h-48 border-2 border-dashed border-white/10 rounded-[2rem] flex items-center justify-center text-indigo-300 text-[10px] font-black uppercase tracking-widest">
+                                            Output Terminal
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {step === 2 && (
-                     <Card title="Step 2: Business Details">
-                        <div className="space-y-6">
-                            <fieldset className="space-y-4">
-                                <legend className="text-lg font-semibold text-gray-900 pb-2 w-full">Business Address</legend>
-                                <TextArea label="Physical Address" id="businessPhysicalAddress" value={formData.businessPhysicalAddress} onChange={e => setFormData(p => ({...p, businessPhysicalAddress: e.target.value}))} required />
-                                <TextArea label="Postal Address" id="businessPostalAddress" value={formData.businessPostalAddress} onChange={e => setFormData(p => ({...p, businessPostalAddress: e.target.value}))} required />
+                     <Card title="Physical Presence" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                        <div className="space-y-10">
+                            <fieldset className="space-y-6 text-left">
+                                <legend className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 pb-3 w-full mb-4">Official Registered Address</legend>
+                                <TextArea label="Full Physical Address" id="businessPhysicalAddress" value={formData.businessPhysicalAddress} onChange={e => setFormData(p => ({...p, businessPhysicalAddress: e.target.value}))} required />
+                                <div className="relative">
+                                    <TextArea label="Postal / Service Address" id="businessPostalAddress" value={formData.businessPostalAddress} onChange={e => setFormData(p => ({...p, businessPostalAddress: e.target.value}))} required />
+                                    <div className="absolute top-0 right-0">
+                                        <button 
+                                            type="button"
+                                            onClick={copyBusinessAddress}
+                                            className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 cursor-pointer uppercase tracking-widest underline"
+                                        >
+                                            Same as Physical
+                                        </button>
+                                    </div>
+                                </div>
                             </fieldset>
-                            <fieldset className="space-y-4">
-                                <legend className="text-lg font-semibold text-gray-900 border-t border-gray-100 pt-4 pb-2 w-full">Financial Year End</legend>
-                                <div>
-                                    <label htmlFor="yearEnd" className="block text-sm font-medium text-gray-700">Select Month</label>
-                                    <select id="yearEnd" value={formData.yearEnd} onChange={e => setFormData(p => ({...p, yearEnd: e.target.value}))} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <fieldset className="space-y-6 text-left border-t border-slate-50 pt-8">
+                                <legend className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] pb-3 w-full mb-4">Financial Configuration</legend>
+                                <div className="max-w-md">
+                                    <div className="flex items-center mb-2">
+                                        <label htmlFor="yearEnd" className="block text-xs font-black text-slate-500 uppercase tracking-wider">Financial Year End</label>
+                                        <Tooltip content="The month your financial year ends. Standard for SA is February.">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2 text-slate-300 hover:text-indigo-500 transition-colors cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </Tooltip>
+                                    </div>
+                                    <select id="yearEnd" value={formData.yearEnd} onChange={e => setFormData(p => ({...p, yearEnd: e.target.value}))} className="form-input">
                                         {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(month => (<option key={month} value={month}>{month}</option>))}
                                     </select>
                                 </div>
@@ -402,23 +640,70 @@ const CompanyRegistration: React.FC = () => {
                 )}
 
                 {step === 3 && (
-                     <Card title="Step 3: Director(s) Information">
-                        <div className="space-y-4">
-                            {formData.directors.map((director, index) => (<DirectorForm key={director.id} director={director} onUpdate={updateDirector} onRemove={removeDirector} index={index}/>))}
-                            <Button type="button" variant="secondary" onClick={addDirector}>Add Director</Button>
-                            {formData.directors.length === 0 && <p className="text-sm text-red-600">You must add at least one director.</p>}
+                     <Card title="Structure & Control" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                        <div className="text-left space-y-8">
+                            {formData.companyType === CompanyType.NON_PROFIT_COMPANY ? (
+                                <div className="bg-indigo-50 p-8 rounded-[2rem] border border-indigo-100 mb-10 shadow-sm">
+                                    <p className="text-xs text-indigo-900 font-black uppercase tracking-widest mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        NPC Regulatory Protocol
+                                    </p>
+                                    <p className="text-sm text-indigo-700 font-medium leading-relaxed italic">"A Non-Profit Company (NPC) must maintain a minimum of <span className="font-black underline text-indigo-900">3 directors</span> at all times to satisfy the requirements of the Companies Act."</p>
+                                </div>
+                            ) : (
+                                <p className="text-sm font-medium text-slate-500 mb-8 italic">"Appoint your board of directors and allocate equity distribution."</p>
+                            )}
+
+                            <div className="space-y-8">
+                                {formData.directors.map((director, index) => (<DirectorForm key={director.id} director={director} onUpdate={updateDirector} onRemove={removeDirector} index={index}/>))}
+                                
+                                <div className="flex flex-col sm:flex-row justify-between items-center gap-6 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-inner">
+                                    <div className="flex items-center gap-10">
+                                        {formData.companyType === CompanyType.PRIVATE_COMPANY && (
+                                            <div>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Equity Allocation</p>
+                                                <span className={`text-3xl font-black ${Math.abs(formData.directors.reduce((s,d) => s + d.shareholding, 0) - 100) < 0.1 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                    {formData.directors.reduce((s,d) => s + d.shareholding, 0).toFixed(0)}%
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Board Count</p>
+                                            <span className="text-3xl font-black text-slate-900">{formData.directors.length} <span className="text-xs text-slate-300 font-bold uppercase">Appointed</span></span>
+                                        </div>
+                                    </div>
+                                    <Button type="button" variant="primary" onClick={addDirector} className="shadow-lg shadow-indigo-100 !py-4 px-8">+ Add Director</Button>
+                                </div>
+                                
+                                {formData.directors.length === 0 && <p className="text-sm text-center font-black text-rose-500 uppercase tracking-widest animate-pulse">Required: At least one director entry</p>}
+                            </div>
                         </div>
                     </Card>
                 )}
 
                 {step === 4 && (
-                    <Card title="Step 4: Upload Documents">
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="text-md font-semibold text-gray-900">Proof of Business Address</h3>
-                                <p className="text-sm text-gray-500 mb-2">e.g., A utility bill not older than 3 months.</p>
+                    <Card title="Compliance Repository" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                         <div className="bg-amber-50 border border-amber-100 p-8 mb-10 rounded-[2rem] text-left shadow-sm">
+                            <div className="flex gap-6">
+                                <div className="flex-shrink-0 bg-amber-200 h-10 w-10 rounded-xl flex items-center justify-center text-amber-700">
+                                    <svg className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1-1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-amber-800 uppercase tracking-[0.2em] mb-2">Legislative Protocol</p>
+                                    <p className="text-sm text-amber-700 font-medium leading-relaxed italic">
+                                        "Documents must be <span className="font-black underline uppercase">Certified</span> within 3 months to confirm biometric integrity. FICA mandates local address verification."
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-10 text-left">
+                            <div className="p-10 bg-slate-50 border border-slate-100 rounded-[2.5rem] shadow-inner relative group">
+                                <div className="absolute top-6 right-8 text-[10px] font-black text-indigo-400 uppercase tracking-widest">FICA Requirement</div>
+                                <h3 className="text-lg font-black text-slate-800 tracking-tight mb-2">Registered Office Verification</h3>
+                                <p className="text-xs text-slate-400 font-medium mb-6">Upload a utility bill or lease agreement for the physical business location.</p>
                                 <FileUpload
-                                    label="PDF, PNG, JPG up to 5MB"
+                                    label="Digital Proof (PDF/JPG)"
                                     id="business-address-proof"
                                     currentFile={formData.businessAddressProof}
                                     onFileSelect={(file) => setFormData(p => ({ ...p, businessAddressProof: file }))}
@@ -427,11 +712,11 @@ const CompanyRegistration: React.FC = () => {
                             </div>
 
                             {formData.directors.map((director) => (
-                                <div key={director.id} className="pt-4 border-t border-gray-200">
-                                    <h3 className="text-md font-semibold text-gray-900">Certified ID / Passport for {director.fullName || `Director ${formData.directors.indexOf(director) + 1}`}</h3>
-                                    <p className="text-sm text-gray-500 mb-2">Must be a clear, certified copy not older than 3 months.</p>
+                                <div key={director.id} className="pt-10 border-t border-slate-50">
+                                    <h3 className="text-lg font-black text-slate-800 tracking-tight mb-2 uppercase tracking-widest text-xs">Director Credentials: <span className="text-indigo-600 font-black">{director.fullName || `D${formData.directors.indexOf(director) + 1}`}</span></h3>
+                                    <p className="text-xs text-slate-400 font-medium mb-6">Ensure the certification stamp is clear, dated, and signed by a commissioner of oaths.</p>
                                      <FileUpload
-                                        label="PDF, PNG, JPG up to 5MB"
+                                        label="Certified ID Scan"
                                         id={`director-doc-${director.id}`}
                                         currentFile={formData.directorIdDocuments[director.id] || null}
                                         onFileSelect={(file) => setFormData(prev => ({ ...prev, directorIdDocuments: { ...prev.directorIdDocuments, [director.id]: file } }))}
@@ -444,67 +729,103 @@ const CompanyRegistration: React.FC = () => {
                 )}
                 
                 {step === 5 && (
-                     <Card title="Step 5: Primary Contact">
-                        <p className="text-sm text-gray-600 mb-4">Please provide the details of the primary contact person for this registration. This person will receive all correspondence.</p>
-                        <div className="space-y-4">
-                            <Input label="Contact Person Full Name" id="primaryContactName" value={formData.primaryContact.name} onChange={e => handleNestedFormChange('primaryContact', 'name', e.target.value)} required />
-                            <Input label="Contact Person Email" id="primaryContactEmail" type="email" value={formData.primaryContact.email} onChange={e => handleNestedFormChange('primaryContact', 'email', e.target.value)} required />
+                     <Card title="Primary Liaison" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                        <p className="text-sm font-medium text-slate-500 mb-10 text-left italic">"Select the designated authority for CIPC status updates and certificate dispatch."</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <Input label="Liaison Name" id="primaryContactName" value={formData.primaryContact.name} onChange={e => handleNestedFormChange('primaryContact', 'name', e.target.value)} required />
+                            <Input label="Secure Dispatch Email" id="primaryContactEmail" type="email" value={formData.primaryContact.email} onChange={e => handleNestedFormChange('primaryContact', 'email', e.target.value)} required />
                         </div>
                     </Card>
                 )}
 
                 {step === 6 && (
-                    <Card title="Step 6: Review Your Application">
-                        <ReviewSection title="Proposed Company Names" data={[
-                            { label: 'Name 1', value: formData.names.name1 }, { label: 'Name 2', value: formData.names.name2 }, { label: 'Name 3', value: formData.names.name3 }, { label: 'Name 4', value: formData.names.name4 }
-                        ]} />
-                         <ReviewSection title="Business Details" data={[
-                            { label: 'Company Type', value: formData.companyType }, { label: 'Physical Address', value: formData.businessPhysicalAddress }, { label: 'Postal Address', value: formData.businessPostalAddress }, { label: 'Financial Year End', value: formData.yearEnd }
-                        ]} />
-                        {formData.directors.map((dir, i) => (
-                            <ReviewSection key={dir.id} title={`Director ${i+1} Details`} data={[
-                                { label: 'Full Name', value: dir.fullName }, { label: 'ID/Passport', value: `${dir.identificationType} - ${dir.identificationNumber}` }, { label: 'Email', value: dir.email }, { label: 'Phone', value: dir.phone }, { label: 'Physical Address', value: dir.physicalAddress }, { label: 'Postal Address', value: dir.postalAddress }
+                    <Card title="Audit Review" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                        <div className="text-left space-y-4">
+                            <div className="bg-emerald-50 p-6 rounded-[1.5rem] border border-emerald-100 flex items-center gap-4 mb-8 animate-pulse">
+                                <div className="h-4 w-4 bg-emerald-500 rounded-full"></div>
+                                <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em]">Engine Scan: System Data Consistent</p>
+                            </div>
+                            
+                            <ReviewSection title="Identity Profiles" data={[
+                                { label: 'Selected Structure', value: formData.companyType },
+                                { label: 'Primary Entity Name', value: formData.names.name1 }, 
+                                { label: 'Backup Identification', value: formData.names.name2 || 'None' }
                             ]} />
-                        ))}
-                         <ReviewSection title="Uploaded Documents" data={[
-                            { label: 'Proof of Business Address', value: formData.businessAddressProof?.name || 'Not Uploaded' },
-                            ...formData.directors.map(d => ({
-                                label: `ID for ${d.fullName}`,
-                                value: formData.directorIdDocuments[d.id]?.name || 'Not Uploaded'
-                            }))
-                        ]} />
-                        <ReviewSection title="Primary Contact" data={[
-                            { label: 'Full Name', value: formData.primaryContact.name }, { label: 'Email', value: formData.primaryContact.email }
-                        ]} />
-                         <p className="text-sm text-gray-600 mt-6">Please review all information carefully. Once you proceed to payment, you cannot go back.</p>
+                             <ReviewSection title="Physical Location" data={[
+                                { label: 'Business Hub', value: formData.businessPhysicalAddress }, 
+                                { label: 'Fiscal Close', value: formData.yearEnd }
+                            ]} />
+                            {formData.directors.map((dir, i) => (
+                                <ReviewSection key={dir.id} title={`Board Director ${i+1}`} data={[
+                                    { label: 'Identified As', value: dir.fullName }, 
+                                    { label: 'Control Stake', value: formData.companyType === CompanyType.PRIVATE_COMPANY ? `${dir.shareholding}%` : 'Strategic NPC Director' },
+                                    { label: 'Credentials', value: `${dir.identificationType}: ${dir.identificationNumber}` }, 
+                                    { label: 'Contact', value: `${dir.email} / ${dir.phone}` }
+                                ]} />
+                            ))}
+                             <ReviewSection title="Compliance Payload" data={[
+                                { label: 'Address Documentation', value: formData.businessAddressProof?.name || 'Missing' },
+                                ...formData.directors.map(d => ({
+                                    label: `ID: ${d.fullName}`,
+                                    value: formData.directorIdDocuments[d.id]?.name || 'Missing'
+                                }))
+                            ]} />
+                             <div className="mt-12 bg-indigo-50 p-8 rounded-[2rem] border border-indigo-100 text-left relative overflow-hidden">
+                                <div className="absolute top-0 right-0 h-20 w-20 bg-indigo-200/20 rounded-full -mr-10 -mt-10"></div>
+                                <p className="text-xs text-indigo-800 font-bold leading-relaxed relative z-10 italic">
+                                    "By initiating the transmission, you confirm that all telemetry provided is accurate. Falsification of documents is a criminal offense under the Companies Act."
+                                </p>
+                             </div>
+                         </div>
                     </Card>
                 )}
 
                 {step === 7 && (
-                    <Card title="Step 7: Payment">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <Card title="Final Transmission" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-800">Order Summary</h3>
-                                <div className="mt-4 space-y-2 text-sm text-gray-600">
-                                    <div className="flex justify-between">
-                                        <span>Company Registration Service</span>
-                                        <span>R 499.00</span>
+                                <h3 className="text-xl font-black text-slate-800 tracking-tight mb-6">Service Disbursement</h3>
+                                <div className="space-y-4 text-sm font-medium text-slate-500">
+                                    <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                        <span className="uppercase tracking-widest text-[10px] font-black">Official Filing Fee</span>
+                                        <span className="font-black text-slate-800">R 499.00</span>
                                     </div>
-                                    <div className="flex justify-between font-semibold text-gray-800 border-t pt-2">
-                                        <span>Total Due</span>
-                                        <span>R 499.00</span>
+                                    <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                        <span className="uppercase tracking-widest text-[10px] font-black">Electronic Dispatch</span>
+                                        <span className="font-bold text-emerald-600">INCLUDED</span>
                                     </div>
+                                    <div className="flex justify-between items-center pt-6">
+                                        <span className="uppercase tracking-[0.3em] text-[12px] font-black text-indigo-600">Total Commitment</span>
+                                        <span className="text-4xl font-black text-slate-900 tracking-tighter">R 499.00</span>
+                                    </div>
+                                </div>
+                                <div className="mt-10 p-6 bg-indigo-600 rounded-[2rem] text-white shadow-xl relative overflow-hidden shadow-indigo-100">
+                                    <div className="absolute top-0 right-0 h-16 w-16 bg-white/5 rounded-full -mr-8 -mt-8"></div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">Encrypted Tunnel</p>
+                                    <p className="text-xs font-medium leading-relaxed opacity-80 italic">Your session is secured by industry-standard TLS encryption. Transaction processing is handled by our PCI-compliant gateway.</p>
                                 </div>
                             </div>
-                            <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                                <Input label="Cardholder Name" id="cardholderName" value={paymentDetails.cardholderName} onChange={handlePaymentInputChange} required disabled={isPaying} />
-                                <Input label="Card Number" id="cardNumber" value={paymentDetails.cardNumber} onChange={handlePaymentInputChange} placeholder="0000 0000 0000 0000" required disabled={isPaying} />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Input label="Expiry Date (MM/YY)" id="expiryDate" value={paymentDetails.expiryDate} onChange={handlePaymentInputChange} placeholder="MM/YY" required disabled={isPaying} />
-                                    <Input label="CVC" id="cvc" value={paymentDetails.cvc} onChange={handlePaymentInputChange} placeholder="123" required disabled={isPaying} />
+                            <form onSubmit={handlePaymentSubmit} className="space-y-6">
+                                 <div>
+                                    <Input label="Full Name on Asset" id="cardholderName" value={paymentDetails.cardholderName} onChange={handlePaymentInputChange} required disabled={isPaying} className={paymentErrors.cardholderName ? 'border-red-500' : ''}/>
+                                    {paymentErrors.cardholderName && <p className="mt-1 text-[10px] font-black text-rose-500 uppercase tracking-widest">{paymentErrors.cardholderName}</p>}
                                 </div>
-                                <Button type="submit" isLoading={isPaying} className="w-full !py-3">
-                                    {isPaying ? 'Processing Payment...' : 'Pay & Complete Registration'}
+                                <div>
+                                    <Input label="Secure Card Number" id="cardNumber" value={paymentDetails.cardNumber} onChange={handlePaymentInputChange} placeholder="0000 0000 0000 0000" required disabled={isPaying} className={paymentErrors.cardNumber ? 'border-red-500' : ''}/>
+                                     {paymentErrors.cardNumber && <p className="mt-1 text-[10px] font-black text-rose-500 uppercase tracking-widest">{paymentErrors.cardNumber}</p>}
+                                </div>
+                                <div className="grid grid-cols-2 gap-6">
+                                     <div>
+                                        <Input label="Asset Expiry" id="expiryDate" value={paymentDetails.expiryDate} onChange={handlePaymentInputChange} placeholder="MM/YY" required disabled={isPaying} className={paymentErrors.expiryDate ? 'border-red-500' : ''}/>
+                                        {paymentErrors.expiryDate && <p className="mt-1 text-[10px] font-black text-rose-500 uppercase tracking-widest">{paymentErrors.expiryDate}</p>}
+                                    </div>
+                                     <div>
+                                        <Input label="Secure Code (CVC)" id="cvc" value={paymentDetails.cvc} onChange={handlePaymentInputChange} placeholder="123" required disabled={isPaying} className={paymentErrors.cvc ? 'border-red-500' : ''}/>
+                                        {paymentErrors.cvc && <p className="mt-1 text-[10px] font-black text-rose-500 uppercase tracking-widest">{paymentErrors.cvc}</p>}
+                                    </div>
+                                </div>
+                                <Button type="submit" isLoading={isPaying} className="w-full !py-5 shadow-2xl shadow-indigo-100 !rounded-2xl text-base font-black uppercase tracking-widest">
+                                    {isPaying ? 'TRANSMITTING DATA...' : 'AUTHORIZE REGISTRATION'}
                                 </Button>
                             </form>
                         </div>
@@ -512,33 +833,42 @@ const CompanyRegistration: React.FC = () => {
                 )}
 
                 {step === 8 && (
-                    <Card>
-                        <div className="text-center py-12">
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                                <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                    <Card className="!rounded-[3.5rem] shadow-3xl border-0">
+                        <div className="text-center py-20">
+                            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2rem] bg-emerald-50 text-emerald-600 shadow-lg animate-bounce">
+                                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                             </div>
-                            <h3 className="mt-4 text-2xl font-semibold leading-6 text-gray-900">Registration Submitted!</h3>
-                            <div className="mt-2">
-                                <p className="text-md text-gray-600">
-                                    Thank you! We have received your application and payment. We will begin processing it shortly and keep you updated via email.
+                            <h3 className="mt-10 text-4xl font-black text-slate-900 tracking-tighter leading-none">Payload Successfully Dispatched.</h3>
+                            <div className="mt-6 max-w-xl mx-auto space-y-6">
+                                <p className="text-lg text-slate-500 font-medium italic leading-relaxed px-10">
+                                    "Your application for <span className="font-black text-slate-800">{formData.names.name1}</span> is now queued in the CIPC central mainframe."
+                                </p>
+                                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl inline-block shadow-sm">
+                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1 text-center">Reference Identity</p>
+                                    <p className="text-xl font-black text-indigo-900 font-mono tracking-tight">{transactionId}</p>
+                                </div>
+                                <p className="text-sm text-slate-400 font-medium leading-relaxed max-w-sm mx-auto">
+                                    A confirmation dispatch has been sent to your liaison email. Manual audit usually takes 3-5 business days.
                                 </p>
                             </div>
-                            <div className="mt-8">
-                                <Button onClick={resetWizard}>Start Another Registration</Button>
+                            <div className="mt-12 flex justify-center gap-4">
+                                <Button onClick={() => { setFormData(initialFormData); setStep(0); setTransactionId(''); }} className="!rounded-2xl !py-4 px-10">New Registration</Button>
+                                <Button variant="secondary" className="!rounded-2xl !py-4 px-10 bg-slate-50 hover:bg-slate-100 border-0 text-slate-600 font-black uppercase tracking-widest text-[10px]">Back to Control Panel</Button>
                             </div>
                         </div>
                     </Card>
                 )}
                 
                 {step < 8 && (
-                    <div className="flex justify-between items-center pt-6">
-                        <div>
-                            {step > 1 && (<Button type="button" variant="secondary" onClick={prevStep} disabled={isPaying}>Back</Button>)}
-                            {step === 1 && (<Button type="button" variant="secondary" onClick={() => setStep(0)}>Change Type</Button>)}
+                    <div className="flex justify-between items-center pt-10">
+                        <div className="flex gap-4">
+                            {step > 1 && (<Button type="button" variant="secondary" onClick={prevStep} disabled={isPaying} className="!rounded-xl px-8 !py-3">Back</Button>)}
+                            {step === 1 && (<Button type="button" variant="secondary" onClick={() => setStep(0)} className="!rounded-xl px-8 !py-3">Change Type</Button>)}
+                            {step > 0 && <Button type="button" variant="ghost" onClick={resetWizard} className="!text-rose-500 font-black uppercase tracking-widest text-[10px] hover:bg-rose-50 rounded-xl px-4 transition-all">Emergency Reset</Button>}
                         </div>
                         <div>
-                            {step < 6 && (<Button type="button" onClick={nextStep}>Next Step</Button>)}
-                            {step === 6 && (<Button type="button" onClick={nextStep}>Proceed to Payment</Button>)}
+                            {step < 6 && (<Button type="button" onClick={nextStep} className="shadow-xl shadow-indigo-100 !rounded-xl px-12 !py-4">Continue Journey</Button>)}
+                            {step === 6 && (<Button type="button" onClick={nextStep} className="shadow-2xl shadow-indigo-200 !rounded-xl px-12 !py-4 !bg-indigo-600">Confirm & Proceed to Payment</Button>)}
                         </div>
                     </div>
                 )}

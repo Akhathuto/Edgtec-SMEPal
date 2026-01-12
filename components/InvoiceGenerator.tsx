@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Card from './common/Card';
 import Input from './common/Input';
 import TextArea from './common/TextArea';
 import Button from './common/Button';
 import Spinner from './common/Spinner';
 import { generateInvoiceHtml } from '../services/geminiService';
-import type { InvoiceDetails, InvoiceItem } from '../types';
+import type { InvoiceDetails, InvoiceItem, InvoiceTheme } from '../types';
 import { useClients } from '../hooks/useClients';
+import type { ToastType } from './common/Toast';
 
-// Define types for window-injected libraries for TypeScript
 declare global {
     interface Window {
         jspdf: any;
@@ -16,71 +16,100 @@ declare global {
     }
 }
 
-const LAST_INVOICE_NUMBER_KEY = 'sme-pal-last-invoice-number';
-const DEFAULT_INVOICE_NUMBER = 'INV-001';
+const STORAGE_KEYS = {
+    LAST_NUMBER: 'sme-pal-last-invoice-number',
+    HISTORY: 'sme-pal-invoice-history'
+};
+
+const DEFAULT_INVOICE_NUMBER = 'INV-1001';
 
 const getNextInvoiceNumber = (currentNumber: string): string => {
     const numberMatch = currentNumber.match(/\d+$/);
-
-    if (!numberMatch) {
-        return `${currentNumber}-1`;
-    }
-
+    if (!numberMatch) return `${currentNumber}-1`;
     const numStr = numberMatch[0];
     const prefix = currentNumber.substring(0, currentNumber.length - numStr.length);
     const num = parseInt(numStr, 10) + 1;
-    const padding = numStr.length;
-
-    return `${prefix}${String(num).padStart(padding, '0')}`;
+    return `${prefix}${String(num).padStart(numStr.length, '0')}`;
 };
 
+const formatCurrency = (val: number) => {
+    return val.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR' });
+};
 
-const InvoiceGenerator: React.FC = () => {
-    const [details, setDetails] = useState<InvoiceDetails>({
-        fromName: 'Your Company Name',
-        fromAddress: '123 Business Rd, Johannesburg, 2000',
-        fromBusinessNumber: '',
-        fromVatNumber: '',
-        toName: '',
-        toAddress: '',
-        toBusinessNumber: '',
-        toVatNumber: '',
-        invoiceNumber: DEFAULT_INVOICE_NUMBER,
-        date: new Date().toISOString().split('T')[0],
-        paymentTerms: 'Due upon receipt',
-        paymentLink: '',
-        items: [{ id: 1, description: 'Website Development', quantity: 1, unitPrice: 15000 }],
-        notes: 'Payment is due within 30 days.',
-        header: 'INVOICE',
-        footer: 'Thank you for your business!',
-        companyLogo: '',
+interface InvoiceGeneratorProps {
+    showToast: (m: string, t: ToastType) => void;
+}
+
+const THEMES: { id: InvoiceTheme; name: string; color: string }[] = [
+    { id: 'standard', name: 'Classic Pro', color: 'indigo' },
+    { id: 'modern', name: 'Ultra Modern', color: 'violet' },
+    { id: 'minimal', name: 'Clean Minimal', color: 'slate' },
+    { id: 'bold', name: 'High Impact', color: 'rose' }
+];
+
+const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ showToast }) => {
+    const [details, setDetails] = useState<InvoiceDetails>(() => {
+        const today = new Date();
+        const dueDate = new Date();
+        dueDate.setDate(today.getDate() + 30);
+        
+        // Load defaults from settings
+        const settingsStr = localStorage.getItem('smepal_app_settings');
+        const settings = settingsStr ? JSON.parse(settingsStr) : {};
+
+        return {
+            fromName: 'Your Business Name',
+            fromAddress: 'South Africa Office',
+            fromBusinessNumber: settings.companyRegNumber || '',
+            fromVatNumber: settings.companyVatNumber || '',
+            invoiceNumber: DEFAULT_INVOICE_NUMBER,
+            date: today.toISOString().split('T')[0],
+            dueDate: dueDate.toISOString().split('T')[0],
+            bankDetails: settings.defaultBankDetails || '',
+            paymentTerms: settings.defaultPaymentTerms || 'Payment is due within 30 days.',
+            items: [{ id: 1, description: 'Consulting Services', quantity: 1, unitPrice: 1500 }],
+            notes: '',
+            theme: 'standard',
+        } as InvoiceDetails;
     });
+
     const [loading, setLoading] = useState(false);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
-    const [isAutoIncrement, setIsAutoIncrement] = useState(true);
     const [generatedHtml, setGeneratedHtml] = useState('');
-    const [error, setError] = useState('');
+    const [history, setHistory] = useState<InvoiceDetails[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
     const { clients } = useClients();
 
-    // Effect for initializing and updating the invoice number when auto-increment is toggled
+    // Persistence & History
     useEffect(() => {
-        if (isAutoIncrement) {
-            const lastUsedNumber = localStorage.getItem(LAST_INVOICE_NUMBER_KEY);
-            const nextNumber = lastUsedNumber ? getNextInvoiceNumber(lastUsedNumber) : DEFAULT_INVOICE_NUMBER;
-            setDetails(prev => ({ ...prev, invoiceNumber: nextNumber }));
-        }
-    }, [isAutoIncrement]);
+        const last = localStorage.getItem(STORAGE_KEYS.LAST_NUMBER);
+        if (last) setDetails(prev => ({ ...prev, invoiceNumber: prev.invoiceNumber === DEFAULT_INVOICE_NUMBER ? getNextInvoiceNumber(last) : prev.invoiceNumber }));
+        
+        const storedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
+        if (storedHistory) setHistory(JSON.parse(storedHistory));
+    }, []);
 
-    const handleDetailChange = (field: keyof InvoiceDetails, value: string) => {
+    const saveToHistory = (item: InvoiceDetails) => {
+        const updated = [item, ...history.filter(h => h.invoiceNumber !== item.invoiceNumber)].slice(0, 10);
+        setHistory(updated);
+        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+    };
+
+    const loadFromHistory = (item: InvoiceDetails) => {
+        setDetails(item);
+        setGeneratedHtml('');
+        setShowHistory(false);
+        showToast(`Loaded ${item.invoiceNumber} template.`, "info");
+    };
+
+    const updateDetail = (field: keyof InvoiceDetails, value: any) => {
         setDetails(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleItemChange = (id: number, field: keyof InvoiceItem, value: string | number) => {
+    const handleItemChange = (id: number, field: keyof InvoiceItem, value: any) => {
         setDetails(prev => ({
             ...prev,
-            items: prev.items.map(item =>
-                item.id === id ? { ...item, [field]: value } : item
-            )
+            items: prev.items.map(item => item.id === id ? { ...item, [field]: value } : item)
         }));
     };
 
@@ -91,297 +120,228 @@ const InvoiceGenerator: React.FC = () => {
         }));
     };
 
-    const removeItem = (id: number) => {
-        setDetails(prev => ({
-            ...prev,
-            items: prev.items.filter(item => item.id !== id)
-        }));
-    };
-    
-    const handleClientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const clientId = e.target.value;
-        const selectedClient = clients.find(c => c.id === clientId);
-        if (selectedClient) {
-            setDetails(prev => ({
-                ...prev,
-                toName: selectedClient.name,
-                toAddress: selectedClient.address,
-            }));
-        } else {
-            // Reset if they select the placeholder option
-            setDetails(prev => ({
-                ...prev,
-                toName: '',
-                toAddress: '',
-                toBusinessNumber: '',
-                toVatNumber: '',
-            }));
-        }
-    };
+    const grandTotal = useMemo(() => {
+        return details.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    }, [details.items]);
 
-    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        if (!file.type.startsWith('image/')) {
-          setError('Please select an image file (PNG, JPG).');
-          return;
-        }
-        if (file.size > 2 * 1024 * 1024) { // 2MB limit
-          setError('Image size should be less than 2MB.');
-          return;
-        }
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64String = reader.result as string;
-          handleDetailChange('companyLogo', base64String);
-          setError('');
-        };
-        reader.onerror = () => {
-            setError('Failed to read the image file.');
-        }
-        reader.readAsDataURL(file);
-      }
-    };
-    
-    const removeLogo = () => {
-        handleDetailChange('companyLogo', '');
-        const fileInput = document.getElementById('companyLogoUpload') as HTMLInputElement;
-        if (fileInput) {
-            fileInput.value = '';
-        }
-    };
-
-    const handleSubmit = async () => {
+    const handleGenerate = async () => {
         setLoading(true);
-        setError('');
-        setGeneratedHtml('');
         try {
             const html = await generateInvoiceHtml(details);
             setGeneratedHtml(html);
-
-            if (isAutoIncrement) {
-                const usedNumber = details.invoiceNumber;
-                localStorage.setItem(LAST_INVOICE_NUMBER_KEY, usedNumber);
-                const nextNumber = getNextInvoiceNumber(usedNumber);
-                // Update the form for the next invoice
-                setDetails(prev => ({ ...prev, invoiceNumber: nextNumber }));
-            }
+            saveToHistory(details);
+            showToast("Invoice architecture generated successfully.", "success");
         } catch (err: any) {
-            setError(err.message || 'An unexpected error occurred.');
+            showToast(err.message || "Engine failure during generation.", "error");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleExportPdf = async () => {
+    const handleExport = async () => {
         if (!generatedHtml) return;
-    
         setIsExportingPdf(true);
-        setError('');
         try {
-            const invoiceElement = document.getElementById('invoice-preview-content');
-            if (!invoiceElement) {
-                setError('Could not find invoice element to export.');
-                setIsExportingPdf(false);
-                return;
-            }
-    
+            const el = document.getElementById('invoice-preview-container');
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-    
-            const canvas = await window.html2canvas(invoiceElement, {
-                scale: 2, // Higher scale for better quality
-                useCORS: true,
-                width: invoiceElement.scrollWidth,
-                windowWidth: invoiceElement.scrollWidth
-            });
-    
-            const imgData = canvas.toDataURL('image/png');
-            const margin = 15; // 15mm page margin
-    
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-    
-            const usableWidth = pdfWidth - margin * 2;
-    
-            const canvasWidth = canvas.width;
-            const canvasHeight = canvas.height;
-            const aspectRatio = canvasWidth / canvasHeight;
-            
-            const scaledHeight = usableWidth / aspectRatio;
-    
-            let heightLeft = scaledHeight;
-            let position = 0;
-            const usablePageHeight = pdfHeight - margin * 2;
-    
-            pdf.addImage(imgData, 'PNG', margin, margin, usableWidth, scaledHeight);
-            heightLeft -= usablePageHeight;
-    
-            while (heightLeft > 0) {
-                position -= usablePageHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', margin, position + margin, usableWidth, scaledHeight);
-                heightLeft -= usablePageHeight;
-            }
-    
-            pdf.save(`invoice-${details.invoiceNumber || 'download'}.pdf`);
-    
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const canvas = await window.html2canvas(el, { scale: 2, useCORS: true });
+            const img = canvas.toDataURL('image/png');
+            pdf.addImage(img, 'PNG', 10, 10, 190, (190 * canvas.height) / canvas.width);
+            pdf.save(`Invoice-${details.invoiceNumber}.pdf`);
+            localStorage.setItem(STORAGE_KEYS.LAST_NUMBER, details.invoiceNumber);
+            showToast("Document exported successfully.", "success");
         } catch (err) {
-            console.error("Error exporting to PDF:", err);
-            setError('Failed to export invoice to PDF. Please try again.');
+            showToast("PDF Export failed.", "error");
         } finally {
             setIsExportingPdf(false);
         }
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
-    
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card title="Invoice Details" className="h-fit">
-                <div className="space-y-6">
-                    {/* FROM/TO SECTION */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <fieldset className="space-y-4">
-                            <legend className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 w-full">From</legend>
-                            <Input label="Your Name / Company" id="fromName" value={details.fromName} onChange={e => handleDetailChange('fromName', e.target.value)} />
-                            <TextArea label="Your Address" id="fromAddress" value={details.fromAddress} onChange={e => handleDetailChange('fromAddress', e.target.value)} rows={2} />
-                            <Input label="Company Registration Number" id="fromBusinessNumber" value={details.fromBusinessNumber || ''} onChange={e => handleDetailChange('fromBusinessNumber', e.target.value)} placeholder="e.g. 2023/123456/07" />
-                            <Input label="VAT Number (Optional)" id="fromVatNumber" value={details.fromVatNumber || ''} onChange={e => handleDetailChange('fromVatNumber', e.target.value)} placeholder="e.g. 4000123456" />
-                        </fieldset>
-                        <fieldset className="space-y-4">
-                            <legend className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 w-full">To</legend>
-                            <div>
-                                <label htmlFor="client-select" className="block text-sm font-medium text-gray-700 mb-1">Select Client</label>
-                                <select id="client-select" onChange={handleClientSelect} className="form-input">
-                                    <option value="">-- Manual Entry or Select a Client --</option>
-                                    {clients.map(client => (<option key={client.id} value={client.id}>{client.name}</option>))}
-                                </select>
-                            </div>
-                            <Input label="Client Name / Company" id="toName" value={details.toName} onChange={e => handleDetailChange('toName', e.target.value)} placeholder="Client Co." />
-                            <TextArea label="Client Address" id="toAddress" value={details.toAddress} onChange={e => handleDetailChange('toAddress', e.target.value)} rows={2} placeholder="456 Client Ave, Cape Town, 8000" />
-                            <Input label="Client Company Reg / Tax No. (Optional)" id="toBusinessNumber" value={details.toBusinessNumber || ''} onChange={e => handleDetailChange('toBusinessNumber', e.target.value)} placeholder="e.g. 2023/123456/07" />
-                            <Input label="Client VAT Number (Optional)" id="toVatNumber" value={details.toVatNumber || ''} onChange={e => handleDetailChange('toVatNumber', e.target.value)} placeholder="e.g. 4000123456" />
-                        </fieldset>
-                    </div>
-
-                    {/* SETTINGS SECTION */}
-                    <fieldset className="space-y-4">
-                        <legend className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 w-full">Invoice Settings</legend>
-                        <div className="grid grid-cols-2 gap-4">
-                             <div>
-                                <Input 
-                                    label="Invoice Number" 
-                                    id="invoiceNumber" 
-                                    value={details.invoiceNumber} 
-                                    onChange={e => handleDetailChange('invoiceNumber', e.target.value)}
-                                    readOnly={isAutoIncrement}
-                                    className={isAutoIncrement ? 'bg-slate-100 cursor-not-allowed' : ''}
-                                />
-                                <div className="mt-2 flex items-center">
-                                    <input
-                                        id="auto-increment"
-                                        type="checkbox"
-                                        checked={isAutoIncrement}
-                                        onChange={e => setIsAutoIncrement(e.target.checked)}
-                                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
-                                    />
-                                    <label htmlFor="auto-increment" className="ml-2 block text-sm text-gray-700">
-                                        Auto-increment
-                                    </label>
-                                </div>
-                            </div>
-                             <Input label="Date" id="date" type="date" value={details.date} onChange={e => handleDetailChange('date', e.target.value)} />
-                        </div>
-                        <Input label="Payment Terms (Optional)" id="paymentTerms" value={details.paymentTerms || ''} onChange={e => handleDetailChange('paymentTerms', e.target.value)} placeholder="e.g., Net 30, Due upon receipt" />
-                        <Input label="Online Payment Link (Optional)" id="paymentLink" value={details.paymentLink || ''} onChange={e => handleDetailChange('paymentLink', e.target.value)} placeholder="e.g., https://pay.your-provider.com/..." />
-                    </fieldset>
-
-                    {/* BRANDING & CUSTOMIZATION SECTION */}
-                    <fieldset className="space-y-4 pt-4 border-t border-slate-200">
-                        <legend className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 w-full">Branding & Customization</legend>
+        <div className="max-w-[1600px] mx-auto animate-fade-in relative">
+            <div className="flex flex-col lg:flex-row gap-10 items-start">
+                {/* STUDIO CONTROLS */}
+                <div className="w-full lg:w-[450px] space-y-8 lg:sticky lg:top-24">
+                    <div className="flex justify-between items-end">
                         <div>
-                            <label htmlFor="companyLogoUpload" className="block text-sm font-medium text-gray-700 mb-1">Company Logo (Optional)</label>
-                             <div className="mt-1 flex items-center gap-4">
-                                {details.companyLogo ? (
-                                    <div className="flex items-center gap-2">
-                                        <img src={details.companyLogo} alt="Company Logo Preview" className="h-16 w-16 object-contain border p-1 rounded-md bg-white" />
-                                        <Button variant="danger" onClick={removeLogo} className="!py-1 !px-2">Remove</Button>
-                                    </div>
-                                ) : (
-                                    <input id="companyLogoUpload" type="file" accept="image/png, image/jpeg" onChange={handleLogoUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
-                                )}
-                            </div>
-                            {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+                            <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight mb-2">Invoice Studio</h1>
+                            <p className="text-sm font-medium text-slate-500 italic">"Design professional billing in seconds."</p>
                         </div>
-                        <Input label="Header Title" id="header" value={details.header || ''} onChange={e => handleDetailChange('header', e.target.value)} placeholder="e.g., INVOICE or TAX INVOICE" />
-                        <TextArea label="Footer Text (Optional)" id="footer" value={details.footer || ''} onChange={e => handleDetailChange('footer', e.target.value)} rows={2} placeholder="e.g., Thank you for your business!"/>
-                    </fieldset>
+                        <button 
+                            onClick={() => setShowHistory(!showHistory)}
+                            className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
+                            title="Draft History"
+                        >
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </button>
+                    </div>
 
-                    {/* ITEMS SECTION */}
-                    <fieldset>
-                        <legend className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 w-full mb-4">Items</legend>
-                        <div className="space-y-3">
-                            {details.items.map((item, index) => (
-                                <div key={item.id} className="grid grid-cols-12 gap-2 items-end p-2 rounded-md bg-slate-50 border border-slate-200">
-                                    <div className="col-span-12 sm:col-span-5"><Input label={`Item ${index + 1}`} id={`desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product"/></div>
-                                    <div className="col-span-4 sm:col-span-2"><Input label="Qty" id={`qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)} /></div>
-                                    <div className="col-span-8 sm:col-span-3"><Input label="Price (R)" id={`price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)} /></div>
-                                    <div className="col-span-12 sm:col-span-2 flex justify-end">
-                                        <button onClick={() => removeItem(item.id)} className="w-full sm:w-auto inline-flex items-center justify-center !py-2 !px-3 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 focus:ring-red-500">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                                        </button>
+                    <Card className="rounded-[2.5rem] border-0 shadow-xl overflow-hidden p-0">
+                        <div className="bg-indigo-600 p-8 text-white">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-200 mb-4">Branding & Style</h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                {THEMES.map(t => (
+                                    <button 
+                                        key={t.id} 
+                                        onClick={() => updateDetail('theme', t.id)}
+                                        className={`px-4 py-3 rounded-xl text-xs font-black transition-all border ${details.theme === t.id ? 'bg-white text-indigo-600 border-white shadow-lg' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                                    >
+                                        {t.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="p-8 space-y-8 bg-white dark:bg-slate-800">
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b border-slate-50 dark:border-slate-700 pb-2">Entity Details</h3>
+                                <div className="space-y-4">
+                                    <Input label="Business Name" id="fromName" value={details.fromName} onChange={e => updateDetail('fromName', e.target.value)} />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Input label="Reg No." id="freg" value={details.fromBusinessNumber} onChange={e => updateDetail('fromBusinessNumber', e.target.value)} />
+                                        <Input label="VAT No." id="fvat" value={details.fromVatNumber} onChange={e => updateDetail('fromVatNumber', e.target.value)} />
+                                    </div>
+                                    <Input label="Invoice #" id="invNo" value={details.invoiceNumber} onChange={e => updateDetail('invoiceNumber', e.target.value)} />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Input label="Date" type="date" id="invDate" value={details.date} onChange={e => updateDetail('date', e.target.value)} />
+                                        <Input label="Due Date" type="date" id="dueDate" value={details.dueDate} onChange={e => updateDetail('dueDate', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Recipient</label>
+                                        <select 
+                                            onChange={e => {
+                                                const c = clients.find(cl => cl.id === e.target.value);
+                                                if(c) { updateDetail('toName', c.name); updateDetail('toAddress', c.address); }
+                                            }}
+                                            className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:text-white transition-all outline-none"
+                                        >
+                                            <option value="">Select Saved Client</option>
+                                            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                        <Button variant="secondary" onClick={addItem} className="mt-3">Add Item</Button>
-                    </fieldset>
-                    
-                     <fieldset className="space-y-4">
-                        <legend className="text-lg font-semibold text-slate-900 border-b border-slate-200 pb-2 w-full">Notes</legend>
-                        <TextArea label="Additional Notes" id="notes" value={details.notes} onChange={e => handleDetailChange('notes', e.target.value)} rows={2} />
-                    </fieldset>
+                            </section>
 
-                    <div className="pt-4">
-                        <Button onClick={handleSubmit} isLoading={loading} className="w-full">Generate Invoice</Button>
-                    </div>
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b border-slate-50 dark:border-slate-700 pb-2">Line Items</h3>
+                                <div className="space-y-3">
+                                    {details.items.map((item, idx) => (
+                                        <div key={item.id} className="p-4 bg-slate-50 dark:bg-slate-700 rounded-2xl border border-slate-200 dark:border-slate-600 group relative">
+                                            <div className="grid grid-cols-12 gap-3">
+                                                <input 
+                                                    placeholder="Description"
+                                                    value={item.description}
+                                                    onChange={e => handleItemChange(item.id, 'description', e.target.value)}
+                                                    className="col-span-12 bg-transparent font-bold text-slate-700 dark:text-white outline-none placeholder:text-slate-300"
+                                                />
+                                                <div className="col-span-4 flex items-center gap-2 bg-white dark:bg-slate-600 px-2 py-1.5 rounded-lg border border-slate-100 dark:border-slate-500">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase">Qty</span>
+                                                    <input type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', Number(e.target.value))} className="w-full text-xs font-bold outline-none dark:text-white" />
+                                                </div>
+                                                <div className="col-span-4 flex items-center gap-2 bg-white dark:bg-slate-600 px-2 py-1.5 rounded-lg border border-slate-100 dark:border-slate-500">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase">ZAR</span>
+                                                    <input type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', Number(e.target.value))} className="w-full text-xs font-bold outline-none dark:text-white" />
+                                                </div>
+                                                <div className="col-span-4 flex flex-col items-end justify-center">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase text-indigo-500">Line Total</span>
+                                                    <span className="text-xs font-black text-slate-700 dark:text-white">{formatCurrency(item.quantity * item.unitPrice)}</span>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => updateDetail('items', details.items.filter(i => i.id !== item.id))}
+                                                className="absolute -right-2 -top-2 h-6 w-6 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                            >
+                                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button onClick={addItem} className="w-full py-3 border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-600 transition-all">+ Add Line Item</button>
+                                </div>
+                            </section>
+
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b border-slate-50 dark:border-slate-700 pb-2">Financial Protocol</h3>
+                                <TextArea label="Banking Details" id="bank" value={details.bankDetails} onChange={e => updateDetail('bankDetails', e.target.value)} rows={3} />
+                                <TextArea label="Payment Terms" id="pterms" value={details.paymentTerms} onChange={e => updateDetail('paymentTerms', e.target.value)} rows={2} />
+                            </section>
+
+                            <div className="pt-6 border-t border-slate-50 dark:border-slate-700 flex justify-between items-center">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total Estimate</p>
+                                    <p className="text-2xl font-black text-slate-800 dark:text-white tracking-tighter">{formatCurrency(grandTotal)}</p>
+                                </div>
+                            </div>
+
+                            <Button onClick={handleGenerate} isLoading={loading} className="w-full !rounded-2xl !py-5 shadow-2xl shadow-indigo-100 text-base">Generate Document</Button>
+                        </div>
+                    </Card>
                 </div>
-            </Card>
 
-            <Card title="Invoice Preview" className="lg:sticky lg:top-8">
-                {loading && (
-                    <div className="flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
-                        <Spinner />
-                        <p className="mt-4 text-slate-600">Generating your professional invoice...</p>
-                    </div>
-                )}
-                {error && !loading && <div className="text-red-600 bg-red-50 p-4 rounded-md">{error}</div>}
-                {generatedHtml && (
-                    <div>
-                         <div className="flex flex-wrap justify-end gap-2 mb-4">
-                            <Button variant="secondary" onClick={handleExportPdf} isLoading={isExportingPdf}>Export PDF</Button>
-                            <Button variant="secondary" onClick={handlePrint}>Print</Button>
-                            <Button variant="secondary" onClick={() => navigator.clipboard.writeText(generatedHtml)}>Copy HTML</Button>
+                {/* PAPER PREVIEW */}
+                <div className="flex-1 w-full relative">
+                     <div className="mb-6 flex justify-between items-center">
+                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Document Canvas</h3>
+                        {generatedHtml && (
+                            <div className="flex gap-2">
+                                <Button variant="secondary" onClick={() => window.print()} className="!py-2 !px-4 text-xs bg-white border-slate-200">Print</Button>
+                                <Button onClick={handleExport} isLoading={isExportingPdf} className="!py-2 !px-4 text-xs">Download PDF</Button>
+                            </div>
+                        )}
+                     </div>
+
+                     <div className="bg-slate-200/30 dark:bg-slate-900/50 rounded-[2.5rem] p-4 sm:p-12 shadow-inner min-h-[842px] flex justify-center overflow-hidden">
+                        {generatedHtml ? (
+                            <div 
+                                id="invoice-preview-container"
+                                className="w-full max-w-[210mm] bg-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] rounded-lg overflow-hidden animate-scale-in origin-top"
+                                dangerouslySetInnerHTML={{ __html: generatedHtml }}
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center text-slate-400 text-center space-y-4 py-32">
+                                <div className="h-24 w-24 rounded-[2rem] bg-white dark:bg-slate-800 shadow-xl flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-700">
+                                    <svg className="h-10 w-10 text-slate-200 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                </div>
+                                <p className="text-lg font-black text-slate-800 dark:text-slate-400 tracking-tight">Studio Idle.</p>
+                                <p className="text-sm font-medium max-w-xs">Fill out the details on the left and click "Generate Document" to build your PDF.</p>
+                            </div>
+                        )}
+                     </div>
+                </div>
+            </div>
+
+            {/* HISTORY DRAWER */}
+            {showHistory && (
+                <>
+                    <div className="fixed inset-0 bg-slate-900/10 backdrop-blur-sm z-[60] lg:hidden" onClick={() => setShowHistory(false)}></div>
+                    <div className="fixed right-0 top-0 bottom-0 w-80 bg-white dark:bg-slate-800 shadow-2xl z-[70] p-8 border-l border-slate-100 dark:border-slate-700 animate-slide-in-right overflow-y-auto">
+                        <div className="flex justify-between items-center mb-8">
+                            <h4 className="font-black text-slate-800 dark:text-white uppercase tracking-widest text-xs">Draft History</h4>
+                            <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg></button>
                         </div>
-                        <div id="invoice-preview-content" className="border rounded-md p-4 bg-white shadow-inner" dangerouslySetInnerHTML={{ __html: generatedHtml }} />
+                        {history.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">No recent drafts found.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {history.map((h, i) => (
+                                    <div 
+                                        key={i} 
+                                        onClick={() => loadFromHistory(h)}
+                                        className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-white dark:hover:bg-slate-600 transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs font-black text-slate-800 dark:text-white">{h.invoiceNumber}</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">{h.date}</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase truncate">{h.toName || 'Unnamed Recipient'}</p>
+                                        <p className="mt-2 text-xs font-black text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">Load Template →</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                )}
-                 {!loading && !generatedHtml && (
-                    <div className="text-center p-16 text-slate-500 flex flex-col items-center justify-center min-h-[400px] bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        <p className="font-semibold">Your generated invoice will appear here.</p>
-                        <p className="text-sm">Fill out the details on the left and click "Generate".</p>
-                    </div>
-                 )}
-            </Card>
+                </>
+            )}
         </div>
     );
 };
