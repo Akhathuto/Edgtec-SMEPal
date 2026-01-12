@@ -1,120 +1,104 @@
-# AI Business Assistant for South African SMEs (SMEPal)
+# SMEPal | Enterprise-Grade AI Business Assistant
 
 ![React](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-blue?style=for-the-badge&logo=tailwindcss&logoColor=white)
-![Google Gemini](https://img.shields.io/badge/Google_Gemini-API-blue?style=for-the-badge&logo=google&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-3.0-indigo?style=for-the-badge&logo=google&logoColor=white)
 
-SMEPal is an AI-powered assistant designed to help South African Small and Medium-sized Enterprises (SMEs) streamline their administrative tasks. It provides a suite of tools to simplify invoicing, tax estimation, contract drafting, and client management, saving business owners time and effort.
+SMEPal is a high-fidelity, AI-powered administrative suite specifically engineered for South African Small and Medium-sized Enterprises (SMEs). By leveraging the latest breakthroughs in large language models and real-time grounding, SMEPal transforms complex statutory and operational hurdles into streamlined, automated workflows.
 
-## Our Story: Built by EDGTEC
+---
 
-> SMEPal is proudly developed by **EDGTEC (Pty) Ltd (Reg: 2025/534716/07)**, a South African technology company. As a small business ourselves, we experienced firsthand the administrative hurdles that many South African SMEs face. From complex invoicing to navigating compliance, these tasks consume valuable time that could be spent on growth.
->
-> This experience was the driving force behind SMEPal. We built this suite of tools to solve our own problems and to empower other entrepreneurs with a simple, powerful, and AI-driven assistant. Our goal is to make business administration less of a burden, allowing SMEs to focus on what truly matters: their passion and their business.
+## 🏗️ Core Architecture
 
-## ✨ Key Features
+SMEPal is built on a "Privacy-First" local telemetry model. Your sensitive business data (Client lists, Invoice history, Expense logs) remains stored in your browser's local sandbox, ensuring maximum sovereignty and POPIA compliance.
 
--   **📄 AI Invoice Generator**: Create professional, branded invoices. Customize with your company logo, fill client details from a saved list, and generate clean HTML with Tailwind CSS.
--   **🧾 AI Tax Calculator**: Get a quick estimate of annual income tax liability for a sole proprietor in South Africa.
--   **✍️ AI Contract Assistant**: Generate basic contract templates from a natural language description.
--   **👥 Client Management**: Add, view, edit, and delete client details. Data is stored locally in your browser, and you can export your client list to CSV.
--   **🏢 Company Registration Service**: A guided, multi-step form to collect all necessary information for CIPC registration, offered as a paid service.
--   **🗓️ Payroll Reminders**: A dashboard of key statutory deadlines for South African businesses (PAYE, VAT, etc.).
--   **ℹ️ Informational Pages**: Includes 'About Us', 'Contact', and a helpful FAQ section.
+### ✨ Primary Studios & Desks
 
-## 🚀 Tech Stack
+-   **🎙️ Strategy Desk (AI Advisor)**: A multi-modal consultation terminal. Supports low-latency voice interaction and real-time Google Search grounding to provide accurate advice on ZAR economic shifts, SARS legislation (2024/2025), and CCMA protocols.
+-   **🎨 Neural Invoice Studio**: Generative HTML engine that builds professional, branded invoices. Choose from multiple design "DNA" types (Modern, Minimal, Bold) and export directly to high-res PDF.
+-   **🔍 Audit Studio (Receipt Scanner)**: Uses advanced vision models to extract merchant signatures, dates, and deductible amounts from photographs of receipts, automatically populating your audit trail.
+-   **⚖️ Legal Studio (Contract Assistant)**: Generates high-fidelity contract templates from natural language descriptions, tailored for the South African legal context.
+-   **📉 Taxation Estimator**: A predictive engine that calculates individual income tax liability based on the latest SARS tax brackets and rebates.
+-   **🏢 Registration Portal**: A guided CIPC company registration wizard that manages name reservation, director appointment, and compliance document ingestion.
+-   **📢 Marketing Studio**: Synthesizes high-converting social media copy and AI visual prompts tailored to specific South African demographics.
 
--   **Frontend**: [React](https://reactjs.org/) with [TypeScript](https://www.typescriptlang.org/)
--   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
--   **AI Integration**: [Google Gemini API](https://ai.google.dev/) via the `@google/genai` SDK.
+---
 
-## 🔧 Getting Started
+## 🧠 Intelligence Layer
 
-This project is set up to run in a modern development environment that supports TypeScript and JSX compilation without a traditional build step, using ES modules and import maps.
+SMEPal utilizes a tiered model strategy to balance speed and reasoning depth:
+
+-   **Gemini 3 Pro Preview**: Powers the Strategy Desk and Legal Studio for complex reasoning, legislative analysis, and long-form document drafting.
+-   **Gemini 3 Flash Preview**: Handles high-speed tasks like standard invoicing and name suggestions.
+-   **Gemini 2.5 Flash Image**: Drives the Audit Studio OCR, performing sub-second extraction of financial data from raw imagery.
+-   **Gemini 2.5 Flash Native Audio**: Enables the low-latency voice consultation experience in the Strategy Desk.
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-You will need a local web server capable of serving static files. A popular choice is `live-server`:
-```bash
-npm install -g live-server
-```
+-   A modern browser (Chrome, Edge, or Safari) with `localStorage` enabled.
+-   A valid **Google Gemini API Key**.
 
-### Installation
+### Configuration
 
-1.  **Clone the repository:**
+The application requires an environment variable `API_KEY` to be set in your execution context.
+
+1.  **Clone the Repository**:
     ```bash
-    git clone https://your-repository-url.com/sme-pal.git
+    git clone https://github.com/your-repo/sme-pal.git
     cd sme-pal
     ```
 
-2.  **Configure Environment Variables:**
-    This application requires a Google Gemini API key. Ensure the `API_KEY` environment variable is available in the execution context where the application is served. See the [Environment Variables](#-environment-variables) section for more details.
-
-3.  **Run the application:**
-    Start a local server from the root of the project directory.
+2.  **Initialize Development Server**:
+    Serve the project using a local server like `live-server` or `vite`.
     ```bash
-    live-server
+    # Example using live-server
+    live-server --port=8080
     ```
-    The application should now be running and accessible in your browser, typically at `http://127.0.0.1:8080`.
 
-## 🔐 Environment Variables
+3.  **Neural Link Sync**:
+    Upon first launch, navigate to **Application Settings** to configure your Enterprise defaults (VAT rates, Banking details, and AI Reasoning depth).
 
-To use the AI-powered features, you must provide a Google Gemini API key.
+---
 
--   `API_KEY`: Your Google Gemini API key.
+## 🛡️ Security & Sovereignty
 
-The application is configured to read this key from `process.env.API_KEY`. It must be set in the environment where the app is built or served.
+-   **POPIA Compliance**: SMEPal includes a "Storage Purge Protocol" in the settings suite, allowing users to instantly destroy all local telemetry.
+-   **Data Portability**: Users can export their entire workspace as an encrypted JSON telemetry snapshot for manual backup or migration.
+-   **End-to-End Encryption**: All communication with the Gemini Neural Engine is secured via TLS 1.3.
 
-## 🧠 How the AI Works
+---
 
-The application leverages the Google Gemini API (`gemini-2.5-flash` model) to power its core features:
+## 🛠️ Project Hierarchy
 
--   **Invoicing**: A detailed prompt is constructed with the user's invoice data in JSON format. The AI is asked to return a professional HTML structure using Tailwind CSS classes.
--   **Tax Calculation**: The model is given income/expense data and instructed to return a structured JSON object with the tax estimation, using the `responseSchema` feature.
--   **Contract Generation**: The user's description is sent to the model, which is prompted to generate a JSON object containing a contract title and an array of clauses.
--   **Company Name Suggestion**: During registration, the AI suggests creative company names based on a business description.
-
-## 💰 Monetization
-
-The application is designed around a Freemium model:
--   **Free Tier**: Access to core tools with some limitations.
--   **Pro Tier (R99–R499/mo)**: Unlocks advanced features, unlimited usage, and integrations (e.g., calendar reminders).
--   **Company Registration Service**: A one-time fee of R499 for handling the CIPC registration process.
-
-## 📂 Project Structure
-
-```
+```text
 /
 ├── components/
-│   ├── common/         # Reusable components (Button, Input, Card)
-│   ├── ...             # Feature-specific components
+│   ├── common/         # Atomic UI components (Button, Input, Card, Spinner)
+│   ├── ...             # Feature-specific "Studios" and "Desks"
 ├── hooks/
-│   └── useClients.ts   # Custom hook for localStorage client management
+│   └── useClients.ts   # LocalStorage state management logic
 ├── services/
-│   └── geminiService.ts# Handles all API calls to the Google Gemini API
-├── types.ts            # TypeScript interfaces and enums
-├── App.tsx             # Main application component
-├── index.html          # Entry HTML file
-└── index.tsx           # React application entry point
+│   └── geminiService.ts# Neural Engine Orchestrator (API integration)
+├── utils/
+│   └── validation.ts   # RSA ID (Luhn) and Payment integrity logic
+├── types.ts            # Core TypeScript definitions
+├── App.tsx             # Main layout & Navigation router
+└── index.tsx           # React root initialization
 ```
 
-## 🤝 Contributing
+---
 
-Contributions are welcome! If you have suggestions for improvements, please feel free to open an issue or submit a pull request.
+## 📞 Support & Identity
 
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+SMEPal is proudly developed by **EDGTEC (Pty) Ltd** (Reg: 2025/534716/07).
 
-## ⚠️ Disclaimer
-
-The Tax Calculator and Contract Assistant tools are for informational purposes only and do not constitute professional financial or legal advice. Users should consult with a qualified accountant or lawyer for their specific needs.
-
-## 📞 Contact
-
-EDGTEC (Pty) Ltd
+-   **Lead Developer**: Ranthutu Lepheane
 -   **Email**: r.lepheane@outlook.com
--   **Phone**: +27 71 184 6709
+-   **HQ**: Springs, Gauteng, South Africa
+
+*Disclaimer: SMEPal provides AI-generated guidance and templates. It is not a substitute for professional legal or financial advice from a certified South African attorney or Chartered Accountant.*
