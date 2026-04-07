@@ -91,5 +91,28 @@ async function testConnection() {
 }
 testConnection();
 
+// User Profile Helpers
+export const saveUserProfile = async (userId: string, data: any) => {
+  const path = `users/${userId}`;
+  try {
+    await setDoc(doc(db, 'users', userId), {
+      ...data,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+};
+
+export const getUserProfile = async (userId: string) => {
+  const path = `users/${userId}`;
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    return userDoc.exists() ? userDoc.data() : null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+};
+
 export { doc, collection, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, addDoc, onAuthStateChanged };
 export type { User };

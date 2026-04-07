@@ -24,7 +24,7 @@ import DirectorVerification from './components/DirectorVerification';
 import ReceiptScanner from './components/ReceiptScanner';
 import MarketingAssistant from './components/MarketingAssistant';
 import Toast, { ToastType } from './components/common/Toast';
-import { auth, onAuthStateChanged, logout, User, db, doc, getDoc } from './firebase';
+import { auth, onAuthStateChanged, logout, User, db, doc, getDoc, getUserProfile } from './firebase';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -50,8 +50,8 @@ const App: React.FC = () => {
       if (currentUser) {
         // Check if user needs onboarding by looking at Firestore
         try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          if (!userDoc.exists() || !userDoc.data()?.onboardingComplete) {
+          const profile = await getUserProfile(currentUser.uid);
+          if (!profile || !profile.onboardingComplete) {
             setNeedsOnboarding(true);
           } else {
             setNeedsOnboarding(false);
@@ -114,15 +114,15 @@ const App: React.FC = () => {
       case Tool.DASHBOARD: return <Dashboard onNavigate={setActiveTool} />;
       case Tool.ADVISOR: return <BusinessAdvisor />;
       case Tool.INVOICE: return <InvoiceGenerator showToast={showToast} />;
-      case Tool.TAX: return <TaxCalculator showToast={showToast} />;
+      case Tool.TAX: return <TaxCalculator />;
       case Tool.EXPENSES: return <ReceiptScanner showToast={showToast} />;
       case Tool.MARKETING: return <MarketingAssistant showToast={showToast} />;
-      case Tool.PAYROLL: return <PayrollReminders showToast={showToast} />;
+      case Tool.PAYROLL: return <PayrollReminders />;
       case Tool.CONTRACT: return <ContractAssistant showToast={showToast} />;
       case Tool.CLIENTS: return <ClientManager showToast={showToast} />;
       case Tool.COMPANY_REGISTRATION: return <CompanyRegistration showToast={showToast} />;
-      case Tool.COMPLIANCE: return <ComplianceAssistant showToast={showToast} />;
-      case Tool.DIRECTOR_VERIFICATION: return <DirectorVerification showToast={showToast} />;
+      case Tool.COMPLIANCE: return <ComplianceAssistant />;
+      case Tool.DIRECTOR_VERIFICATION: return <DirectorVerification />;
       case Tool.USER_PROFILE: return <UserProfile showToast={showToast} />;
       case Tool.SETTINGS: return <Settings showToast={showToast} />;
       case Tool.ABOUT: return <About />;
@@ -151,7 +151,7 @@ const App: React.FC = () => {
   }
 
   if (needsOnboarding) {
-    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
+    return <OnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
   }
 
   return (

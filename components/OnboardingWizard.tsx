@@ -4,12 +4,14 @@ import Input from './common/Input';
 import Button from './common/Button';
 import TextArea from './common/TextArea';
 import Logo from './common/Logo';
+import { saveUserProfile, User } from '../firebase';
 
 interface OnboardingWizardProps {
+  user: User;
   onComplete: () => void;
 }
 
-const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
+const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ user, onComplete }) => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -45,11 +47,25 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
 
   const handleSubmit = async () => {
     setIsLoading(true);
-    // Persist onboarding data
-    localStorage.setItem('smepal_business_profile', JSON.stringify(formData));
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    onComplete();
+    try {
+      // Persist onboarding data to Firestore
+      await saveUserProfile(user.uid, {
+        ...formData,
+        fullName: user.displayName || 'Unnamed User',
+        email: user.email || '',
+        onboardingComplete: true
+      });
+      
+      // Also keep in localStorage for immediate feedback if needed
+      localStorage.setItem('smepal_business_profile', JSON.stringify(formData));
+      
+      onComplete();
+    } catch (error) {
+      console.error("Failed to save onboarding data:", error);
+      // Error boundary will catch the thrown error from handleFirestoreError
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const renderStep = () => {

@@ -420,13 +420,13 @@ console.log(\`Score: \${audit.score}%\`);`}
           </div>
           <div className="space-y-6">
             {[
-              { icon: <Mail />, label: 'Email', val: 'hello@neuralcore.co.za' },
-              { icon: <Phone />, label: 'Phone', val: '+27 (0) 11 555 0123' },
-              { icon: <MapPin />, label: 'Office', val: '128 Rivonia Rd, Sandton, JHB' }
+              { icon: <Mail className="h-5 w-5" />, label: 'Email', val: 'hello@neuralcore.co.za' },
+              { icon: <Phone className="h-5 w-5" />, label: 'Phone', val: '+27 (0) 11 555 0123' },
+              { icon: <MapPin className="h-5 w-5" />, label: 'Office', val: '128 Rivonia Rd, Sandton, JHB' }
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-6 group cursor-pointer">
                 <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                  {React.cloneElement(item.icon as React.ReactElement, { className: 'h-5 w-5' })}
+                  {item.icon}
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{item.label}</p>

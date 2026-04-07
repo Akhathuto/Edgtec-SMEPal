@@ -1,10 +1,10 @@
 {
-  "projectId": "utrend-195da",
-  "appId": "1:967632133926:web:4277d9269d2c1dfe17ebe7",
-  "apiKey": "AIzaSyAem2AKr0JvvcbBCTizCvIHkJrVEMiEn1A",
-  "authDomain": "utrend-195da.firebaseapp.com",
+  "projectId": "smepal-281bc",
+  "appId": "1:389744369234:web:afeba22774ebc2aee7098b",
+  "apiKey": "AIzaSyAJS1bAdKCyGeIfsN-h6xDsS5GgBiffFgI",
+  "authDomain": "smepal-281bc.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-0c6e7cdd-71df-4001-bfee-fb49e49859d0",
-  "storageBucket": "utrend-195da.firebasestorage.app",
-  "messagingSenderId": "967632133926",
+  "storageBucket": "smepal-281bc.firebasestorage.app",
+  "messagingSenderId": "389744369234",
   "measurementId": ""
 }
