@@ -16,12 +16,14 @@ import {
 } from 'lucide-react';
 import Logo from './common/Logo';
 import Button from './common/Button';
+import { StaticPageSlug } from './StaticPage';
 
 interface LandingPageProps {
   onSignIn: () => void;
+  onStaticPage: (slug: StaticPageSlug) => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onSignIn }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onStaticPage }) => {
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -49,7 +51,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSignIn }) => {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">Features</a>
             <a href="#pricing" className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">Pricing</a>
-            <a href="#about" className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">About</a>
+            <button 
+              onClick={() => onStaticPage('about')}
+              className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors"
+            >
+              About
+            </button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -388,30 +395,30 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSignIn }) => {
             <div>
               <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 mb-8">Product</h4>
               <ul className="space-y-4">
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Features</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Pricing</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Roadmap</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">API</a></li>
+                <li><button onClick={() => onStaticPage('features')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Features</button></li>
+                <li><button onClick={() => onStaticPage('pricing')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Pricing</button></li>
+                <li><button onClick={() => onStaticPage('roadmap')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Roadmap</button></li>
+                <li><button onClick={() => onStaticPage('api')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">API</button></li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 mb-8">Company</h4>
               <ul className="space-y-4">
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">About Us</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Careers</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Blog</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Contact</a></li>
+                <li><button onClick={() => onStaticPage('about')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">About Us</button></li>
+                <li><button onClick={() => onStaticPage('careers')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Careers</button></li>
+                <li><button onClick={() => onStaticPage('blog')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Blog</button></li>
+                <li><button onClick={() => onStaticPage('contact')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Contact</button></li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 mb-8">Legal</h4>
               <ul className="space-y-4">
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">POPIA Compliance</a></li>
-                <li><a href="#" className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Cookie Policy</a></li>
+                <li><button onClick={() => onStaticPage('privacy')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Privacy Policy</button></li>
+                <li><button onClick={() => onStaticPage('terms')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Terms of Service</button></li>
+                <li><button onClick={() => onStaticPage('popia')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">POPIA Compliance</button></li>
+                <li><button onClick={() => onStaticPage('cookie')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors">Cookie Policy</button></li>
               </ul>
             </div>
           </div>

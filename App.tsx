@@ -10,6 +10,7 @@ import ClientManager from './components/ClientManager';
 import Header from './components/Header';
 import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
+import StaticPage, { StaticPageSlug } from './components/StaticPage';
 import OnboardingWizard from './components/OnboardingWizard';
 import Settings from './components/Settings';
 import { Tool } from './types';
@@ -30,6 +31,7 @@ const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [staticPage, setStaticPage] = useState<StaticPageSlug | null>(null);
   const [activeTool, setActiveTool] = useState<Tool>(Tool.DASHBOARD);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: ToastType } | null>(null);
@@ -139,10 +141,13 @@ const App: React.FC = () => {
   }
 
   if (!user) {
+    if (staticPage) {
+      return <StaticPage slug={staticPage} onBack={() => setStaticPage(null)} onNavigate={setStaticPage} />;
+    }
     if (showLogin) {
       return <LoginPage onBack={() => setShowLogin(false)} />;
     }
-    return <LandingPage onSignIn={() => setShowLogin(true)} />;
+    return <LandingPage onSignIn={() => setShowLogin(true)} onStaticPage={setStaticPage} />;
   }
 
   if (needsOnboarding) {

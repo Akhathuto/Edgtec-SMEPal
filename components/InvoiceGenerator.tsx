@@ -4,7 +4,7 @@ import Input from './common/Input';
 import TextArea from './common/TextArea';
 import Button from './common/Button';
 import Spinner from './common/Spinner';
-import { generateInvoiceHtml } from '../services/geminiService';
+import { generateInvoiceHtml, getSmartInvoiceRecommendations } from '../services/geminiService';
 import type { InvoiceDetails, InvoiceItem, InvoiceTheme } from '../types';
 import { useClients } from '../hooks/useClients';
 import type { ToastType } from './common/Toast';
@@ -74,6 +74,8 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ showToast }) => {
     });
 
     const [loading, setLoading] = useState(false);
+    const [isRecommending, setIsRecommending] = useState(false);
+    const [recommendations, setRecommendations] = useState<{ suggestedItems: string[], pricingAdvice: string } | null>(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [generatedHtml, setGeneratedHtml] = useState('');
     const [history, setHistory] = useState<InvoiceDetails[]>([]);
@@ -135,6 +137,22 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ showToast }) => {
             showToast(err.message || "Engine failure during generation.", "error");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGetRecommendations = async () => {
+        const profile = localStorage.getItem('smepal_business_profile');
+        const businessSector = profile ? JSON.parse(profile).businessSector : 'General';
+        
+        setIsRecommending(true);
+        try {
+            const result = await getSmartInvoiceRecommendations(businessSector, details.items);
+            setRecommendations(result);
+            showToast("AI Recommendations generated.", "success");
+        } catch (err: any) {
+            showToast("Failed to get recommendations.", "error");
+        } finally {
+            setIsRecommending(false);
         }
     };
 
@@ -271,7 +289,50 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ showToast }) => {
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total Estimate</p>
                                     <p className="text-2xl font-black text-slate-800 dark:text-white tracking-tighter">{formatCurrency(grandTotal)}</p>
                                 </div>
+                                <button 
+                                    onClick={handleGetRecommendations}
+                                    disabled={isRecommending}
+                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all disabled:opacity-50"
+                                >
+                                    <svg className={`h-3 w-3 ${isRecommending ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    {isRecommending ? 'Analyzing...' : 'Smart Advice'}
+                                </button>
                             </div>
+
+                            {recommendations && (
+                                <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100 animate-soft-reveal">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">AI Strategy Insight</h4>
+                                        <button onClick={() => setRecommendations(null)} className="text-indigo-300 hover:text-indigo-600"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Upsell Opportunities</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {recommendations.suggestedItems.map((item, i) => (
+                                                    <button 
+                                                        key={i}
+                                                        onClick={() => {
+                                                            setDetails(prev => ({
+                                                                ...prev,
+                                                                items: [...prev.items, { id: Date.now(), description: item, quantity: 1, unitPrice: 0 }]
+                                                            }));
+                                                            showToast(`Added "${item}" to invoice.`, "success");
+                                                        }}
+                                                        className="px-3 py-1.5 bg-white border border-indigo-100 rounded-lg text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all"
+                                                    >
+                                                        + {item}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Market Context</p>
+                                            <p className="text-xs font-medium text-slate-600 leading-relaxed">{recommendations.pricingAdvice}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <Button onClick={handleGenerate} isLoading={loading} className="w-full !rounded-2xl !py-5 shadow-2xl shadow-indigo-100 text-base">Generate Document</Button>
                         </div>

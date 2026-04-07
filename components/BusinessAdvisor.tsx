@@ -1,9 +1,11 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Card from './common/Card';
 import Button from './common/Button';
 import { createAdvisorChat } from '../services/geminiService';
 import { GenerateContentResponse, Chat, GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
+import { useClients } from '../hooks/useClients';
+import { useExpenses } from '../hooks/useExpenses';
 
 interface Message {
     role: 'user' | 'model';
@@ -30,6 +32,8 @@ const formatResponse = (text: string) => {
 };
 
 const BusinessAdvisor: React.FC = () => {
+    const { clients } = useClients();
+    const { expenses } = useExpenses();
     const [isVoiceMode, setIsVoiceMode] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         { role: 'model', text: "Hello! I'm your AI Business Advisor. I can help you with questions about South African tax, compliance, marketing strategies, or general business advice. How can I assist you today?" }
@@ -39,6 +43,27 @@ const BusinessAdvisor: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatSessionRef = useRef<Chat | null>(null);
 
+    // Business Context
+    const businessContext = useMemo(() => {
+        const session = localStorage.getItem('smepal_session');
+        const profile = localStorage.getItem('smepal_business_profile');
+        const parsedSession = session ? JSON.parse(session) : {};
+        const parsedProfile = profile ? JSON.parse(profile) : {};
+        
+        const monthlySpend = expenses
+            .filter(e => new Date(e.date).getMonth() === new Date().getMonth())
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        return {
+            userName: parsedSession.name || 'Entrepreneur',
+            businessSector: parsedProfile.businessSector || 'General',
+            clientCount: clients.length,
+            monthlyExpenses: monthlySpend,
+            totalExpensesCount: expenses.length,
+            projectedMonthlyRevenue: clients.length * 12500, // Simple heuristic
+        };
+    }, [clients, expenses]);
+
     // Live API Refs
     const audioContextRef = useRef<AudioContext | null>(null);
     const liveSessionRef = useRef<any>(null);
@@ -47,11 +72,11 @@ const BusinessAdvisor: React.FC = () => {
     const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
     useEffect(() => {
-        chatSessionRef.current = createAdvisorChat();
+        chatSessionRef.current = createAdvisorChat(businessContext);
         return () => {
             stopVoiceMode();
         };
-    }, []);
+    }, [businessContext]);
 
     const scrollToBottom = useCallback(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -143,7 +168,14 @@ const BusinessAdvisor: React.FC = () => {
                 config: {
                     responseModalities: [Modality.AUDIO],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
-                    systemInstruction: "You are a professional business advisor. Keep spoken responses concise and helpful.",
+                    systemInstruction: `You are a professional business advisor for South African SMEs. Keep spoken responses concise and helpful.
+                    
+                    Current Business Context:
+                    - User: ${businessContext.userName}
+                    - Sector: ${businessContext.businessSector}
+                    - Clients: ${businessContext.clientCount}
+                    - Monthly Expenses: R ${businessContext.monthlyExpenses}
+                    - Projected Revenue: R ${businessContext.projectedMonthlyRevenue}`,
                 }
             });
             liveSessionRef.current = await sessionPromise;

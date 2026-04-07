@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Chat } from "@google/genai";
-import type { InvoiceDetails, TaxCalculationResult, GeneratedContract, ComplianceGuide, DirectorVerificationResult, Expense, MarketingContent } from '../types';
+import type { InvoiceDetails, InvoiceItem, TaxCalculationResult, GeneratedContract, ComplianceGuide, DirectorVerificationResult, Expense, MarketingContent } from '../types';
 
 if (!process.env.API_KEY) {
     console.warn("API_KEY environment variable not set. The application might not work as expected.");
@@ -382,15 +382,50 @@ Return a JSON object with:
     }
 };
 
-export const createAdvisorChat = (): Chat => {
+export const createAdvisorChat = (context?: any): Chat => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const contextStr = context ? `\n\n**Current Business Context:**\n${JSON.stringify(context, null, 2)}` : '';
+    
     return ai.chats.create({
         model: PRO_MODEL,
         config: {
             tools: [{ googleSearch: {} }],
-            systemInstruction: "You are a knowledgeable and helpful business advisor for South African SMEs. Provide clear, concise, and practical advice on topics like tax, compliance, marketing, and operations within the South African context. Use Markdown for formatting. Use Google Search to verify current interest rates, tax laws for 2024/2025, or any recent government gazette changes. If search results are used, mention the source.",
+            systemInstruction: `You are a knowledgeable and helpful business advisor for South African SMEs. Provide clear, concise, and practical advice on topics like tax, compliance, marketing, and operations within the South African context. Use Markdown for formatting. Use Google Search to verify current interest rates, tax laws for 2024/2025, or any recent government gazette changes. If search results are used, mention the source.${contextStr}`,
         }
     });
+};
+
+export const getSmartInvoiceRecommendations = async (businessSector: string, currentItems: InvoiceItem[]): Promise<{ suggestedItems: string[], pricingAdvice: string }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const prompt = `
+Act as a business consultant for a South African SME in the "${businessSector}" sector.
+Based on their current invoice items: ${JSON.stringify(currentItems)}, provide:
+1. A list of 3-5 additional services or products they could potentially upsell or include.
+2. Brief pricing advice or market trends for this sector in South Africa.
+
+Return a JSON object with 'suggestedItems' (array of strings) and 'pricingAdvice' (string).
+`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: DEFAULT_MODEL,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        suggestedItems: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        pricingAdvice: { type: Type.STRING }
+                    }
+                }
+            }
+        });
+        return JSON.parse(response.text.trim());
+    } catch (error) {
+        console.error("Error getting invoice recommendations:", error);
+        throw new Error("Failed to get smart recommendations.");
+    }
 };
 
 export const getDailyBusinessTip = async (): Promise<string> => {
