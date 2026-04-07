@@ -149,6 +149,7 @@ export interface Expense {
   amount: number;
   category: string;
   description?: string;
+  createdAt?: string;
 }
 
 export interface MarketingContent {

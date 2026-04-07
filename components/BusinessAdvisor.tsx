@@ -94,7 +94,7 @@ const BusinessAdvisor: React.FC = () => {
 
     const startVoiceMode = async () => {
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             micStreamRef.current = stream;
 
@@ -103,7 +103,7 @@ const BusinessAdvisor: React.FC = () => {
             audioContextRef.current = outputCtx;
 
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+                model: 'gemini-3.1-flash-live-preview',
                 callbacks: {
                     onopen: () => {
                         const source = inputCtx.createMediaStreamSource(stream);
@@ -112,7 +112,7 @@ const BusinessAdvisor: React.FC = () => {
                             const inputData = e.inputBuffer.getChannelData(0);
                             const base64 = encodePCM(inputData);
                             sessionPromise.then(s => s.sendRealtimeInput({ 
-                                media: { data: base64, mimeType: 'audio/pcm;rate=16000' } 
+                                audio: { data: base64, mimeType: 'audio/pcm;rate=16000' } 
                             }));
                         };
                         source.connect(processor);
@@ -149,7 +149,6 @@ const BusinessAdvisor: React.FC = () => {
             liveSessionRef.current = await sessionPromise;
         } catch (err) {
             console.error("Mic error", err);
-            alert("Could not access microphone.");
         }
     };
 

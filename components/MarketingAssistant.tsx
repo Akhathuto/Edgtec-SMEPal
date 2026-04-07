@@ -1,35 +1,29 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Card from './common/Card';
 import Input from './common/Input';
 import TextArea from './common/TextArea';
 import Button from './common/Button';
+import type { ToastType } from './common/Toast';
 import { generateMarketingContent } from '../services/geminiService';
 import type { MarketingContent } from '../types';
+import { useMarketingDrafts, SavedDraft } from '../hooks/useMarketingDrafts';
 
 const platforms = ['LinkedIn', 'Facebook', 'Instagram', 'Twitter/X', 'Email Newsletter'];
-const STORAGE_KEY = 'sme-pal-marketing-drafts';
 
-interface SavedDraft extends MarketingContent {
-    id: string;
-    topic: string;
-    timestamp: number;
+interface MarketingAssistantProps {
+    showToast: (m: string, t: ToastType) => void;
 }
 
-const MarketingAssistant: React.FC = () => {
+const MarketingAssistant: React.FC<MarketingAssistantProps> = ({ showToast }) => {
+    const { drafts: savedDrafts, saveDraft: archiveDraft, deleteDraft: removeDraft, isLoading } = useMarketingDrafts();
     const [topic, setTopic] = useState('');
     const [audience, setAudience] = useState('');
     const [platform, setPlatform] = useState('LinkedIn');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<MarketingContent | null>(null);
     const [error, setError] = useState('');
-    const [savedDrafts, setSavedDrafts] = useState<SavedDraft[]>([]);
     const [showLibrary, setShowLibrary] = useState(false);
-
-    useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) setSavedDrafts(JSON.parse(stored));
-    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -47,18 +41,15 @@ const MarketingAssistant: React.FC = () => {
         }
     };
 
-    const saveDraft = () => {
+    const handleSaveDraft = async () => {
         if (!result) return;
-        const newDraft: SavedDraft = {
+        const newDraft: Omit<SavedDraft, 'id'> = {
             ...result,
-            id: crypto.randomUUID(),
             topic,
-            timestamp: Date.now()
+            createdAt: new Date().toISOString()
         };
-        const updated = [newDraft, ...savedDrafts].slice(0, 20);
-        setSavedDrafts(updated);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        alert('Draft archived to library!');
+        await archiveDraft(newDraft);
+        showToast('Draft archived to library!', 'success');
     };
 
     const loadDraft = (d: SavedDraft) => {
@@ -68,16 +59,15 @@ const MarketingAssistant: React.FC = () => {
         setShowLibrary(false);
     };
 
-    const deleteDraft = (id: string, e: React.MouseEvent) => {
+    const handleDeleteDraft = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        const updated = savedDrafts.filter(d => d.id !== id);
-        setSavedDrafts(updated);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        await removeDraft(id);
+        showToast('Draft removed from library.', 'info');
     };
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        alert('Copied to clipboard!');
+        showToast('Copied to clipboard!', 'info');
     };
 
     return (
@@ -145,7 +135,7 @@ const MarketingAssistant: React.FC = () => {
                     {result && (
                          <Button 
                             variant="secondary" 
-                            onClick={saveDraft}
+                            onClick={handleSaveDraft}
                             className="w-full !py-3 !rounded-xl border-slate-200 text-xs font-black uppercase tracking-widest"
                         >
                             Save to library
@@ -238,14 +228,14 @@ const MarketingAssistant: React.FC = () => {
                                     >
                                         <div className="flex justify-between items-start mb-1">
                                             <span className="text-xs font-black text-slate-800 truncate pr-6">{d.topic}</span>
-                                            <button onClick={(e) => deleteDraft(d.id, e)} className="text-slate-300 hover:text-rose-500 absolute top-4 right-4 transition-colors">
+                                            <button onClick={(e) => handleDeleteDraft(d.id, e)} className="text-slate-300 hover:text-rose-500 absolute top-4 right-4 transition-colors">
                                                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                                             </button>
                                         </div>
                                         <p className="text-[10px] text-slate-400 font-black uppercase mb-3">{d.platform}</p>
                                         <p className="text-[11px] text-slate-500 line-clamp-2 italic mb-3">"{d.content.substring(0, 60)}..."</p>
                                         <div className="flex justify-end">
-                                            <span className="text-[9px] font-bold text-slate-300">{new Date(d.timestamp).toLocaleDateString()}</span>
+                                            <span className="text-[9px] font-bold text-slate-300">{new Date(d.createdAt).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                 ))}

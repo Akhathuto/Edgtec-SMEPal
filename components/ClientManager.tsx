@@ -5,6 +5,7 @@ import Card from './common/Card';
 import Button from './common/Button';
 import Spinner from './common/Spinner';
 import ClientFormModal from './ClientFormModal';
+import ConfirmModal from './common/ConfirmModal';
 import type { Client } from '../types';
 import type { ToastType } from './common/Toast';
 
@@ -30,6 +31,18 @@ const ClientManager: React.FC<ClientManagerProps> = ({ showToast }) => {
     const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'primary' | 'danger';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     // Enhanced Search Logic
     const filteredClients = useMemo(() => {
@@ -63,19 +76,33 @@ const ClientManager: React.FC<ClientManagerProps> = ({ showToast }) => {
     };
 
     const handleDelete = (id: string) => {
-        if (window.confirm("Archiving this client will remove them from the active directory. Proceed?")) {
-            deleteClient(id);
-            setSelectedIds(prev => prev.filter(sid => sid !== id));
-            showToast("Client successfully archived.", "info");
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: "Archive Client?",
+            message: "Archiving this client will remove them from the active directory. Proceed?",
+            variant: 'danger',
+            onConfirm: () => {
+                deleteClient(id);
+                setSelectedIds(prev => prev.filter(sid => sid !== id));
+                showToast("Client successfully archived.", "info");
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            }
+        });
     };
 
     const handleBulkDelete = () => {
-        if (window.confirm(`Are you sure you want to delete ${selectedIds.length} selected clients?`)) {
-            deleteClients(selectedIds);
-            setSelectedIds([]);
-            showToast(`${selectedIds.length} clients archived successfully.`, "success");
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: "Bulk Archive?",
+            message: `Are you sure you want to delete ${selectedIds.length} selected clients?`,
+            variant: 'danger',
+            onConfirm: () => {
+                deleteClients(selectedIds);
+                setSelectedIds([]);
+                showToast(`${selectedIds.length} clients archived successfully.`, "success");
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            }
+        });
     };
 
     const toggleSelectAll = () => {
@@ -250,6 +277,15 @@ const ClientManager: React.FC<ClientManagerProps> = ({ showToast }) => {
                 onClose={() => setIsModalOpen(false)}
                 onSave={handleSaveClient}
                 clientToEdit={clientToEdit}
+            />
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
             />
         </div>
     );

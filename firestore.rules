@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields:
+    //   - fullName: string (required)
+    //   - email: string (required, email format)
+    //   - companyName: string (optional)
+    //   - companyRegNumber: string (optional)
+    //   - taxNumber: string (optional)
+    //   - industry: string (optional)
+    //   - onboardingComplete: bool (optional)
+    //   - updatedAt: timestamp (optional)
+    //
+    // Collection: /users/{userId}/clients/{clientId}
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (optional, email format)
+    //   - phone: string (optional)
+    //   - address: string (optional)
+    //   - vatNumber: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: /users/{userId}/invoices/{invoiceId}
+    // Fields:
+    //   - clientId: string (required)
+    //   - clientName: string (required)
+    //   - invoiceNumber: string (required)
+    //   - date: string (required, date format)
+    //   - dueDate: string (required, date format)
+    //   - items: list (required, list of objects)
+    //   - total: number (required, positive)
+    //   - status: string (required, enum: draft, sent, paid, overdue)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: /users/{userId}/expenses/{expenseId}
+    // Fields:
+    //   - merchant: string (required)
+    //   - date: string (required, date format)
+    //   - amount: number (required, positive)
+    //   - category: string (required)
+    //   - taxAmount: number (optional)
+    //   - imageUrl: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: /users/{userId}/taxScenarios/{scenarioId}
+    // Fields:
+    //   - name: string (required)
+    //   - income: number (required)
+    //   - expenses: number (required)
+    //   - taxYear: string (required)
+    //   - results: map (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: /users/{userId}/marketingDrafts/{draftId}
+    // Fields:
+    //   - title: string (required)
+    //   - content: string (required)
+    //   - type: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isPositive(val) {
+      return val is number && val >= 0;
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}.*");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['fullName', 'email']) &&
+             data.fullName is string && data.fullName.size() > 0 && data.fullName.size() < 100 &&
+             isValidEmail(data.email);
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['name', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (!('email' in data) || isValidEmail(data.email));
+    }
+
+    function isValidInvoice(data) {
+      return data.keys().hasAll(['clientId', 'invoiceNumber', 'total', 'status', 'createdAt']) &&
+             data.clientId is string &&
+             data.invoiceNumber is string &&
+             isPositive(data.total) &&
+             data.status in ['draft', 'sent', 'paid', 'overdue'];
+    }
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['merchant', 'amount', 'date', 'category', 'createdAt']) &&
+             data.merchant is string &&
+             isPositive(data.amount) &&
+             isValidDateString(data.date);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // User Profile
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow delete: if isOwner(userId);
+
+      // Clients
+      match /clients/{clientId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidClient(request.resource.data);
+        allow update: if isOwner(userId) && isValidClient(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // Invoices
+      match /invoices/{invoiceId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidInvoice(request.resource.data);
+        allow update: if isOwner(userId) && isValidInvoice(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // Expenses
+      match /expenses/{expenseId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidExpense(request.resource.data);
+        allow update: if isOwner(userId) && isValidExpense(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // Tax Scenarios
+      match /taxScenarios/{scenarioId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // Marketing Drafts
+      match /marketingDrafts/{draftId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -5,6 +5,8 @@ import Button from './common/Button';
 import TextArea from './common/TextArea';
 import FileUpload from './common/FileUpload';
 import Tooltip from './common/Tooltip';
+import ConfirmModal from './common/ConfirmModal';
+import type { ToastType } from './common/Toast';
 import { suggestCompanyNames } from '../services/geminiService';
 import { CompanyRegistrationData, Director, CompanyType } from '../types';
 import { validateIdNumber, validatePaymentDetails } from '../utils/validation';
@@ -140,7 +142,11 @@ const initialFormData: CompanyRegistrationData = {
 
 const STORAGE_KEY = 'sme-pal-company-reg-progress';
 
-const CompanyRegistration: React.FC = () => {
+interface CompanyRegistrationProps {
+    showToast: (m: string, t: ToastType) => void;
+}
+
+const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) => {
     const [step, setStep] = useState(0); 
     const [nameSuggestionDescription, setNameSuggestionDescription] = useState('An online store selling handmade leather goods in South Africa');
     const [suggestedNames, setSuggestedNames] = useState<string[]>([]);
@@ -153,6 +159,19 @@ const CompanyRegistration: React.FC = () => {
     const [paymentErrors, setPaymentErrors] = useState<PaymentValidationErrors>({});
     const [isPaying, setIsPaying] = useState(false);
     const [transactionId, setTransactionId] = useState('');
+
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'primary' | 'danger';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
 
     useEffect(() => {
@@ -206,12 +225,20 @@ const CompanyRegistration: React.FC = () => {
     };
     
     const resetWizard = () => {
-        if (window.confirm("This will clear all registration progress. Are you sure?")) {
-            localStorage.removeItem(STORAGE_KEY);
-            setFormData(initialFormData);
-            setStep(0);
-            setTransactionId('');
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: "Reset Registration?",
+            message: "This will clear all registration progress. Are you sure?",
+            variant: 'danger',
+            onConfirm: () => {
+                localStorage.removeItem(STORAGE_KEY);
+                setFormData(initialFormData);
+                setStep(0);
+                setTransactionId('');
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                showToast("Registration progress cleared.", "info");
+            }
+        });
     }
 
     const handleNameSuggestion = async () => {
@@ -261,15 +288,25 @@ const CompanyRegistration: React.FC = () => {
     };
 
     const removeDirector = (id: string) => {
-        setFormData(prev => {
-            const newDirectors = prev.directors.filter(d => d.id !== id);
-            const newDirectorIdDocuments = { ...prev.directorIdDocuments };
-            delete newDirectorIdDocuments[id];
-            return {
-                ...prev,
-                directors: newDirectors,
-                directorIdDocuments: newDirectorIdDocuments
-            };
+        setConfirmConfig({
+            isOpen: true,
+            title: "Remove Director?",
+            message: "Are you sure you want to remove this director from the application?",
+            variant: 'danger',
+            onConfirm: () => {
+                setFormData(prev => {
+                    const newDirectors = prev.directors.filter(d => d.id !== id);
+                    const newDirectorIdDocuments = { ...prev.directorIdDocuments };
+                    delete newDirectorIdDocuments[id];
+                    return {
+                        ...prev,
+                        directors: newDirectors,
+                        directorIdDocuments: newDirectorIdDocuments
+                    };
+                });
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                showToast("Director removed.", "info");
+            }
         });
     };
     
@@ -290,41 +327,48 @@ const CompanyRegistration: React.FC = () => {
 
     const nextStep = () => {
         if (step === 1 && !formData.names.name1) {
-            alert('Please provide at least one proposed company name.');
+            showToast('Please provide at least one proposed company name.', 'error');
             return;
         }
         if (step === 2 && (!formData.businessPhysicalAddress || !formData.businessPostalAddress)) {
-            alert('Please provide both physical and postal business addresses.');
+            showToast('Please provide both physical and postal business addresses.', 'error');
             return;
         }
         if (step === 3) {
             if (formData.directors.length === 0) {
-                alert('You must add at least one director.');
+                showToast('You must add at least one director.', 'error');
                 return;
             }
             if (formData.companyType === CompanyType.NON_PROFIT_COMPANY && formData.directors.length < 3) {
-                alert('A Non-Profit Company (NPC) must have at least 3 directors by law.');
+                showToast('A Non-Profit Company (NPC) must have at least 3 directors by law.', 'error');
                 return;
             }
             if (formData.companyType === CompanyType.PRIVATE_COMPANY) {
                 const totalShareholding = formData.directors.reduce((sum, d) => sum + d.shareholding, 0);
                 if (Math.abs(totalShareholding - 100) > 0.1) {
-                    if (!window.confirm(`Total shareholding is ${totalShareholding}%. It should ideally be 100%. Do you want to verify this later?`)) {
-                        return;
-                    }
+                    setConfirmConfig({
+                        isOpen: true,
+                        title: "Verify Shareholding?",
+                        message: `Total shareholding is ${totalShareholding}%. It should ideally be 100%. Do you want to verify this later?`,
+                        onConfirm: () => {
+                            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                            setStep(prev => Math.min(prev + 1, totalSteps));
+                        }
+                    });
+                    return;
                 }
             }
         }
         if (step === 4) {
             const allDocsUploaded = formData.directors.every(dir => !!formData.directorIdDocuments[dir.id]);
             if (!allDocsUploaded || !formData.businessAddressProof) {
-                alert('Please upload all required documents.');
+                showToast('Please upload all required documents.', 'error');
                 return;
             }
         }
         if (step === 5) {
             if (!formData.primaryContact.name || !formData.primaryContact.email) {
-                alert('Please provide the primary contact details.');
+                showToast('Please provide the primary contact details.', 'error');
                 return;
             }
         }
@@ -337,7 +381,7 @@ const CompanyRegistration: React.FC = () => {
         for (const director of formData.directors) {
             const error = validateIdNumber(director.identificationType, director.identificationNumber);
             if (error) {
-                alert(`Error for Director ${director.fullName || ' '}: ${error}`);
+                showToast(`Error for Director ${director.fullName || ' '}: ${error}`, 'error');
                 setStep(3);
                 return;
             }
@@ -873,6 +917,15 @@ const CompanyRegistration: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };

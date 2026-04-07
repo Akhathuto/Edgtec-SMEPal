@@ -1,24 +1,12 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
 import Spinner from './common/Spinner';
 import { calculateTax } from '../services/geminiService';
 import type { TaxCalculationResult } from '../types';
-
-interface SavedTaxScenario {
-    id: string;
-    name: string;
-    income: number;
-    expenses: number;
-    deductions: number;
-    credits: number;
-    result: TaxCalculationResult;
-    timestamp: number;
-}
-
-const STORAGE_KEY = 'sme-pal-tax-history';
+import { useTaxScenarios, SavedTaxScenario } from '../hooks/useTaxScenarios';
 
 const formatCurrency = (value: string | number | undefined) => {
     if (value === undefined || value === null) return '0.00';
@@ -52,6 +40,7 @@ const TaxGauge: React.FC<{ percentage: number }> = ({ percentage }) => {
 };
 
 const TaxCalculator = () => {
+    const { scenarios: history, saveScenario: archiveScenario, deleteScenario: removeScenario, isLoading } = useTaxScenarios();
     const [income, setIncome] = useState<number>(500000);
     const [expenses, setExpenses] = useState<number>(120000);
     const [deductions, setDeductions] = useState<number>(35000);
@@ -59,13 +48,7 @@ const TaxCalculator = () => {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<TaxCalculationResult | null>(null);
     const [error, setError] = useState('');
-    const [history, setHistory] = useState<SavedTaxScenario[]>([]);
     const [showHistory, setShowHistory] = useState(false);
-
-    useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) setHistory(JSON.parse(stored));
-    }, []);
 
     const effectiveRate = useMemo(() => {
         if (!result || income === 0) return 0;
@@ -88,24 +71,20 @@ const TaxCalculator = () => {
         }
     };
 
-    const saveScenario = () => {
+    const handleSaveScenario = async () => {
         if (!result) return;
-        const name = window.prompt("Name this tax scenario:", `Scenario ${new Date().toLocaleTimeString()}`);
-        if (!name) return;
+        const name = `Scenario ${new Date().toLocaleTimeString()}`;
 
-        const newScenario: SavedTaxScenario = {
-            id: crypto.randomUUID(),
+        const newScenario: Omit<SavedTaxScenario, 'id'> = {
             name,
             income,
             expenses,
             deductions,
             credits,
             result,
-            timestamp: Date.now()
+            createdAt: new Date().toISOString()
         };
-        const updated = [newScenario, ...history].slice(0, 10);
-        setHistory(updated);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        await archiveScenario(newScenario);
     };
 
     const loadScenario = (s: SavedTaxScenario) => {
@@ -117,11 +96,9 @@ const TaxCalculator = () => {
         setShowHistory(false);
     };
 
-    const deleteScenario = (id: string, e: React.MouseEvent) => {
+    const handleDeleteScenario = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        const updated = history.filter(h => h.id !== id);
-        setHistory(updated);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        await removeScenario(id);
     };
 
     return (
@@ -154,7 +131,7 @@ const TaxCalculator = () => {
                     {result && (
                         <Button 
                             variant="secondary" 
-                            onClick={saveScenario}
+                            onClick={handleSaveScenario}
                             className="w-full !py-3 !rounded-xl border-slate-200 text-xs font-black uppercase tracking-widest"
                         >
                             Save current scenario
@@ -225,14 +202,14 @@ const TaxCalculator = () => {
                                     >
                                         <div className="flex justify-between items-start mb-1">
                                             <span className="text-xs font-black text-slate-800 truncate pr-6">{s.name}</span>
-                                            <button onClick={(e) => deleteScenario(s.id, e)} className="text-slate-300 hover:text-rose-500 absolute top-4 right-4">
+                                            <button onClick={(e) => handleDeleteScenario(s.id, e)} className="text-slate-300 hover:text-rose-500 absolute top-4 right-4">
                                                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                                             </button>
                                         </div>
                                         <p className="text-[10px] text-slate-400 font-black uppercase mb-3">Gross: R {s.income.toLocaleString()}</p>
                                         <div className="flex justify-between items-end">
                                             <div className="text-indigo-600 font-black text-sm">R {formatCurrency(s.result.estimatedTax)}</div>
-                                            <span className="text-[9px] font-bold text-slate-300">{new Date(s.timestamp).toLocaleDateString()}</span>
+                                            <span className="text-[9px] font-bold text-slate-300">{new Date(s.createdAt).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                 ))}

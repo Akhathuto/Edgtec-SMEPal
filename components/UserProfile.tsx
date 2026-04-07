@@ -3,8 +3,14 @@ import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
 import ToggleSwitch from './common/ToggleSwitch';
+import ConfirmModal from './common/ConfirmModal';
+import type { ToastType } from './common/Toast';
 
-const UserProfile: React.FC = () => {
+interface UserProfileProps {
+    showToast: (m: string, t: ToastType) => void;
+}
+
+const UserProfile: React.FC<UserProfileProps> = ({ showToast }) => {
     const [user, setUser] = useState({
         name: 'Jane Naledi D.',
         email: 'jane.doe@edgtec.co.za',
@@ -23,6 +29,18 @@ const UserProfile: React.FC = () => {
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'primary' | 'danger';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const handleUserChange = (field: keyof typeof user, value: string) => {
         setUser(prev => ({ ...prev, [field]: value }));
@@ -45,7 +63,7 @@ const UserProfile: React.FC = () => {
         // Simulate API sync
         await new Promise(resolve => setTimeout(resolve, 1500));
         setIsSaving(false);
-        alert('Profile telemetry synchronized successfully.');
+        showToast('Profile telemetry synchronized successfully.', 'success');
     };
 
     return (
@@ -233,7 +251,18 @@ const UserProfile: React.FC = () => {
                         </div>
                         <Button 
                             variant="danger" 
-                            onClick={() => window.confirm("Final Warning: Data destruction is irreversible. Proceed?")}
+                            onClick={() => {
+                                setConfirmConfig({
+                                    isOpen: true,
+                                    title: "Identity Termination",
+                                    message: "Final Warning: Data destruction is irreversible. Proceed?",
+                                    variant: 'danger',
+                                    onConfirm: () => {
+                                        localStorage.clear();
+                                        window.location.reload();
+                                    }
+                                });
+                            }}
                             className="!px-8 !rounded-2xl !py-4 font-black uppercase tracking-widest text-xs shadow-lg shadow-rose-200 relative z-10"
                         >
                             Purge Data
@@ -241,6 +270,15 @@ const UserProfile: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };

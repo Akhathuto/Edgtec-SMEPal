@@ -4,11 +4,29 @@ import Button from './common/Button';
 import ToggleSwitch from './common/ToggleSwitch';
 import Input from './common/Input';
 import TextArea from './common/TextArea';
+import ConfirmModal from './common/ConfirmModal';
+import type { ToastType } from './common/Toast';
 
 type SettingTab = 'neural' | 'enterprise' | 'interface' | 'security';
 
-const Settings: React.FC = () => {
+interface SettingsProps {
+    showToast: (m: string, t: ToastType) => void;
+}
+
+const Settings: React.FC<SettingsProps> = ({ showToast }) => {
     const [activeTab, setActiveTab] = useState<SettingTab>('neural');
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'primary' | 'danger';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
     const [settings, setSettings] = useState({
         aiDeepReasoning: true,
         creativeConfidence: 0.85,
@@ -86,20 +104,26 @@ const Settings: React.FC = () => {
                     setSettings(data.settings);
                     localStorage.setItem('smepal_app_settings', JSON.stringify(data.settings));
                 }
-                alert("Workspace telemetry successfully restored.");
-                window.location.reload();
+                showToast("Workspace telemetry successfully restored.", "success");
+                setTimeout(() => window.location.reload(), 1500);
             } catch (err) {
-                alert("Failed to parse telemetry file. Ensure it is a valid SMEPal export.");
+                showToast("Failed to parse telemetry file. Ensure it is a valid SMEPal export.", "error");
             }
         };
         reader.readAsText(file);
     };
 
     const clearTelemetry = () => {
-        if (window.confirm("CRITICAL: This will permanently destroy all local business data. This action is compliant with POPIA right-to-be-forgotten protocols. Proceed?")) {
-            localStorage.clear();
-            window.location.reload();
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: "Destroy Workspace Data?",
+            message: "CRITICAL: This will permanently destroy all local business data. This action is compliant with POPIA right-to-be-forgotten protocols. Proceed?",
+            variant: 'danger',
+            onConfirm: () => {
+                localStorage.clear();
+                window.location.reload();
+            }
+        });
     };
 
     const tabs: { id: SettingTab; label: string; icon: React.ReactNode }[] = [
@@ -377,6 +401,15 @@ const Settings: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };

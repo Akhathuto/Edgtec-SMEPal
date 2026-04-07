@@ -1,32 +1,37 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Card from './common/Card';
 import Button from './common/Button';
 import FileUpload from './common/FileUpload';
 import Spinner from './common/Spinner';
+import ConfirmModal from './common/ConfirmModal';
+import type { ToastType } from './common/Toast';
 import { analyzeReceipt } from '../services/geminiService';
 import type { Expense } from '../types';
+import { useExpenses } from '../hooks/useExpenses';
 
-const STORAGE_KEY = 'sme-pal-expenses';
+interface ReceiptScannerProps {
+    showToast: (m: string, t: ToastType) => void;
+}
 
-const ReceiptScanner: React.FC = () => {
-    const [expenses, setExpenses] = useState<Expense[]>([]);
+const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ showToast }) => {
+    const { expenses, addExpense, deleteExpense, isLoading } = useExpenses();
     const [isProcessing, setIsProcessing] = useState(false);
     const [currentFile, setCurrentFile] = useState<File | null>(null);
     const [error, setError] = useState('');
     const [scanProgress, setScanProgress] = useState(0);
-
-    useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            setExpenses(JSON.parse(stored));
-        }
-    }, []);
-
-    const saveExpenses = (newExpenses: Expense[]) => {
-        setExpenses(newExpenses);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newExpenses));
-    };
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'primary' | 'danger';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const handleFileSelect = (file: File) => {
         setCurrentFile(file);
@@ -62,17 +67,18 @@ const ReceiptScanner: React.FC = () => {
                     const analysis = await analyzeReceipt(base64String, currentFile.type);
                     setScanProgress(100);
                     
-                    const newExpense: Expense = {
-                        id: crypto.randomUUID(),
+                    const newExpense: Omit<Expense, 'id'> = {
                         ...analysis,
-                        date: analysis.date || new Date().toISOString().split('T')[0]
+                        date: analysis.date || new Date().toISOString().split('T')[0],
+                        createdAt: new Date().toISOString()
                     };
 
-                    setTimeout(() => {
-                        saveExpenses([newExpense, ...expenses]);
+                    setTimeout(async () => {
+                        await addExpense(newExpense);
                         setCurrentFile(null);
                         setIsProcessing(false);
                         clearInterval(timer);
+                        showToast("Receipt analyzed and saved.", "success");
                     }, 500);
                 } catch (err: any) {
                     setError(err.message);
@@ -88,10 +94,18 @@ const ReceiptScanner: React.FC = () => {
         }
     };
 
-    const deleteExpense = (id: string) => {
-        if (window.confirm("Archive this financial record?")) {
-            saveExpenses(expenses.filter(e => e.id !== id));
-        }
+    const handleDeleteExpense = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: "Archive Record?",
+            message: "Archive this financial record?",
+            variant: 'danger',
+            onConfirm: async () => {
+                await deleteExpense(id);
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                showToast("Financial record archived.", "info");
+            }
+        });
     };
 
     return (
@@ -206,7 +220,7 @@ const ReceiptScanner: React.FC = () => {
                                                 </td>
                                                 <td className="px-8 py-6 text-right">
                                                     <button 
-                                                        onClick={() => deleteExpense(expense.id)} 
+                                                        onClick={() => handleDeleteExpense(expense.id)} 
                                                         className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-rose-500 hover:border-rose-100 rounded-xl transition-all shadow-sm opacity-0 group-hover:opacity-100"
                                                     >
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -221,6 +235,15 @@ const ReceiptScanner: React.FC = () => {
                     </Card>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };

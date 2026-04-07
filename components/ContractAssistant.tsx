@@ -2,14 +2,22 @@ import React, { useState } from 'react';
 import Card from './common/Card';
 import TextArea from './common/TextArea';
 import Button from './common/Button';
+import type { ToastType } from './common/Toast';
 import { generateContract } from '../services/geminiService';
 import type { GeneratedContract } from '../types';
+import { useContracts, SavedContract } from '../hooks/useContracts';
 
-const ContractAssistant: React.FC = () => {
+interface ContractAssistantProps {
+    showToast: (m: string, t: ToastType) => void;
+}
+
+const ContractAssistant: React.FC<ContractAssistantProps> = ({ showToast }) => {
+    const { contracts: savedContracts, saveContract: archiveContract, deleteContract: removeContract, isLoading } = useContracts();
     const [description, setDescription] = useState('A simple freelance graphic design agreement for a logo design project. The freelancer will provide 3 initial concepts, and the client gets 2 rounds of revisions. Total project cost is R5000, with 50% upfront and 50% on completion.');
     const [loading, setLoading] = useState(false);
     const [contract, setContract] = useState<GeneratedContract | null>(null);
     const [error, setError] = useState('');
+    const [showLibrary, setShowLibrary] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,15 +34,47 @@ const ContractAssistant: React.FC = () => {
             setLoading(false);
         }
     };
+
+    const handleSaveContract = async () => {
+        if (!contract) return;
+        const newContract: Omit<SavedContract, 'id'> = {
+            ...contract,
+            description,
+            createdAt: new Date().toISOString()
+        };
+        await archiveContract(newContract);
+        showToast('Contract archived to library!', 'success');
+    };
+
+    const loadContract = (c: SavedContract) => {
+        setContract(c);
+        setDescription(c.description);
+        setShowLibrary(false);
+    };
+
+    const handleDeleteContract = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        await removeContract(id);
+        showToast('Contract removed from library.', 'info');
+    };
     
     return (
-        <div className="max-w-[1600px] mx-auto pb-24 animate-fade-in">
+        <div className="max-w-[1600px] mx-auto pb-24 animate-fade-in relative">
             <div className="flex flex-col lg:flex-row gap-12 items-start">
                 {/* Drafting Panel */}
                 <div className="w-full lg:w-[450px] space-y-8">
-                    <div>
-                        <h1 className="text-4xl font-black text-slate-800 tracking-tight mb-2">Legal Studio</h1>
-                        <p className="text-sm font-medium text-slate-500 italic">"Draft professional agreements using AI logic."</p>
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <h1 className="text-4xl font-black text-slate-800 tracking-tight mb-2">Legal Studio</h1>
+                            <p className="text-sm font-medium text-slate-500 italic">"Draft professional agreements using AI logic."</p>
+                        </div>
+                        <button 
+                            onClick={() => setShowLibrary(!showLibrary)}
+                            className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
+                            title="Legal Library"
+                        >
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                        </button>
                     </div>
 
                     <Card className="!rounded-[2.5rem] !p-8 shadow-2xl border-0 bg-white">
@@ -63,6 +103,16 @@ const ContractAssistant: React.FC = () => {
                             {error && <p className="text-xs font-black text-rose-500 bg-rose-50 p-4 rounded-xl border border-rose-100">{error}</p>}
                         </form>
                     </Card>
+
+                    {contract && (
+                         <Button 
+                            variant="secondary" 
+                            onClick={handleSaveContract}
+                            className="w-full !py-3 !rounded-xl border-slate-200 text-xs font-black uppercase tracking-widest"
+                        >
+                            Save to library
+                        </Button>
+                    )}
                 </div>
 
                 {/* Paper Preview */}
@@ -71,10 +121,13 @@ const ContractAssistant: React.FC = () => {
                         <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Digital Parchment</h3>
                         {contract && (
                             <div className="flex gap-3">
-                                <Button variant="ghost" onClick={() => navigator.clipboard.writeText(
-                                    `${contract.title}\n\n${contract.clauses.map((c, i) => `${i + 1}. ${c.heading}\n${c.body}`).join('\n\n')}`
-                                )} className="!py-2 !px-4 text-[10px] font-black uppercase tracking-widest bg-white border border-slate-100 shadow-sm">Copy Text</Button>
-                                <Button className="!py-2 !px-4 text-[10px] font-black uppercase tracking-widest">Print Draft</Button>
+                                <Button variant="ghost" onClick={() => {
+                                    navigator.clipboard.writeText(
+                                        `${contract.title}\n\n${contract.clauses.map((c, i) => `${i + 1}. ${c.heading}\n${c.body}`).join('\n\n')}`
+                                    );
+                                    showToast('Contract copied to clipboard!', 'info');
+                                }} className="!py-2 !px-4 text-[10px] font-black uppercase tracking-widest bg-white border border-slate-100 shadow-sm">Copy Text</Button>
+                                <Button className="!py-2 !px-4 text-[10px] font-black uppercase tracking-widest" onClick={() => window.print()}>Print Draft</Button>
                             </div>
                         )}
                     </div>
@@ -114,6 +167,43 @@ const ContractAssistant: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* LIBRARY DRAWER */}
+            {showLibrary && (
+                <>
+                    <div className="fixed inset-0 bg-slate-900/10 backdrop-blur-sm z-[60] lg:hidden" onClick={() => setShowLibrary(false)}></div>
+                    <div className="fixed right-0 top-0 bottom-0 w-80 bg-white shadow-2xl z-[70] p-8 border-l border-slate-100 animate-slide-in-right overflow-y-auto">
+                        <div className="flex justify-between items-center mb-8">
+                            <h4 className="font-black text-slate-800 uppercase tracking-widest text-xs">Legal Library</h4>
+                            <button onClick={() => setShowLibrary(false)} className="text-slate-400 hover:text-slate-600"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                        {savedContracts.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">No saved legal templates found.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {savedContracts.map((c) => (
+                                    <div 
+                                        key={c.id} 
+                                        onClick={() => loadContract(c)}
+                                        className="p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-400 hover:bg-white transition-all cursor-pointer group relative"
+                                    >
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="text-xs font-black text-slate-800 pr-6">{c.title}</span>
+                                            <button onClick={(e) => handleDeleteContract(c.id, e)} className="text-slate-300 hover:text-rose-500 absolute top-4 right-4 transition-colors">
+                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 line-clamp-2 italic mb-3">"{c.description.substring(0, 60)}..."</p>
+                                        <div className="flex justify-end">
+                                            <span className="text-[9px] font-bold text-slate-300">{new Date(c.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
         </div>
     );
 };

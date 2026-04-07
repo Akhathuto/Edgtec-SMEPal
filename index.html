@@ -5,103 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SMEPal | Enterprise Grade Assistant</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-      :root {
-        --brand-primary: #4f46e5;
-        --brand-accent: #6366f1;
-        --bg-main: #f8fafc;
-        --text-main: #334155;
-      }
-      
-      .dark-mode {
-        --bg-main: #0f172a;
-        --text-main: #f8fafc;
-      }
-
-      body {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        -webkit-font-smoothing: antialiased;
-        background-color: var(--bg-main);
-        color: var(--text-main);
-        letter-spacing: -0.01em;
-        transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      
-      @keyframes softReveal {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      
-      .animate-soft-reveal { 
-        animation: softReveal 0.6s cubic-bezier(0.2, 0, 0, 1) forwards; 
-      }
-
-      ::-webkit-scrollbar { width: 4px; height: 4px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-      ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-
-      .card-elevation {
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
-        border: 1px solid rgba(226, 232, 240, 0.8);
-      }
-      
-      .dark-mode .card-elevation {
-        background-color: #1e293b;
-        border-color: #334155;
-      }
-
-      .form-input {
-        display: block;
-        width: 100%;
-        padding: 0.625rem 1rem;
-        font-size: 0.875rem;
-        background-color: #ffffff !important;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        transition-property: all;
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-        transition-duration: 300ms;
-        color: #334155;
-        font-weight: 500;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        outline: none;
-      }
-      
-      .dark-mode .form-input {
-        background-color: #1e293b !important;
-        border-color: #334155;
-        color: #f8fafc;
-      }
-      
-      select.form-input {
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-        background-position: right 0.5rem center;
-        background-repeat: no-repeat;
-        background-size: 1.5em 1.5em;
-        padding-right: 2.5rem;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        appearance: none;
-      }
-
-      .form-input:focus {
-        border-color: #4f46e5;
-        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
-      }
-
-      /* Settings Overrides */
-      .compact-layout .card-elevation { margin-bottom: 0.5rem; }
-      .compact-layout main { padding-top: 1rem !important; }
-      
-      .high-contrast-mode body { color: #000; }
-      .high-contrast-mode .form-input { border-color: #000; color: #000; }
-      .high-contrast-mode .card-elevation { border-color: #000; }
-    </style>
     <script type="importmap">
     {
       "imports": {
@@ -114,7 +20,8 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  </head>
+  <link rel="stylesheet" href="/index.css">
+</head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

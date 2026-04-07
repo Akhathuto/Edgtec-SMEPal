@@ -9,6 +9,7 @@ import ContractAssistant from './components/ContractAssistant';
 import ClientManager from './components/ClientManager';
 import Header from './components/Header';
 import LoginPage from './components/LoginPage';
+import LandingPage from './components/LandingPage';
 import OnboardingWizard from './components/OnboardingWizard';
 import Settings from './components/Settings';
 import { Tool } from './types';
@@ -22,10 +23,13 @@ import DirectorVerification from './components/DirectorVerification';
 import ReceiptScanner from './components/ReceiptScanner';
 import MarketingAssistant from './components/MarketingAssistant';
 import Toast, { ToastType } from './components/common/Toast';
+import { auth, onAuthStateChanged, logout, User, db, doc, getDoc } from './firebase';
 
 const App: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const [activeTool, setActiveTool] = useState<Tool>(Tool.DASHBOARD);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: ToastType } | null>(null);
@@ -36,25 +40,41 @@ const App: React.FC = () => {
     highContrastForms: false
   });
 
-  // Load settings and session
+  // Auth Listener
   useEffect(() => {
-    const sessionStr = localStorage.getItem('smepal_session');
-    const settingsStr = localStorage.getItem('smepal_app_settings');
-    
-    if (sessionStr) {
-      const session = JSON.parse(sessionStr);
-      setIsLoggedIn(true);
-      // Only force onboarding if new signup and not yet complete
-      if (session.isNewSignup && !localStorage.getItem('smepal_onboarding_complete')) {
-        setNeedsOnboarding(true);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      
+      if (currentUser) {
+        // Check if user needs onboarding by looking at Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (!userDoc.exists() || !userDoc.data()?.onboardingComplete) {
+            setNeedsOnboarding(true);
+          } else {
+            setNeedsOnboarding(false);
+          }
+        } catch (error) {
+          console.error("Error checking onboarding status:", error);
+          // Fallback to local storage if firestore fails (e.g. rules not yet active)
+          const localOnboarding = localStorage.getItem(`smepal_onboarding_${currentUser.uid}`);
+          setNeedsOnboarding(!localOnboarding);
+        }
       }
-    }
+      
+      setIsAuthReady(true);
+    });
 
+    return () => unsubscribe();
+  }, []);
+
+  // Load settings
+  useEffect(() => {
+    const settingsStr = localStorage.getItem('smepal_app_settings');
     if (settingsStr) {
       setAppSettings(JSON.parse(settingsStr));
     }
 
-    // Listener for local storage changes to sync settings across tabs
     const handleStorageChange = () => {
         const updatedSettings = localStorage.getItem('smepal_app_settings');
         if (updatedSettings) setAppSettings(JSON.parse(updatedSettings));
@@ -63,47 +83,22 @@ const App: React.FC = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const handleLogin = (credentials: { email: string; name?: string; company?: string }) => {
-    const isNewSignup = !!(credentials.name || credentials.company);
-    
-    localStorage.setItem('smepal_session', JSON.stringify({ 
-        email: credentials.email, 
-        name: credentials.name || 'Jane Doe',
-        company: credentials.company || 'Venture Ltd',
-        isNewSignup: isNewSignup,
-        time: Date.now() 
-    }));
-    
-    setIsLoggedIn(true);
-    
-    if (isNewSignup) {
-      setNeedsOnboarding(true);
-      localStorage.removeItem('smepal_onboarding_complete');
-    } else {
-      setNeedsOnboarding(false);
-    }
-  };
-
   const handleOnboardingComplete = () => {
     setNeedsOnboarding(false);
-    localStorage.setItem('smepal_onboarding_complete', 'true');
-    
-    const sessionStr = localStorage.getItem('smepal_session');
-    if (sessionStr) {
-        const session = JSON.parse(sessionStr);
-        session.isNewSignup = false;
-        localStorage.setItem('smepal_session', JSON.stringify(session));
+    if (user) {
+      localStorage.setItem(`smepal_onboarding_${user.uid}`, 'true');
     }
-    
     showToast("Business profile initialized successfully.", "success");
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('smepal_session');
-    localStorage.removeItem('smepal_onboarding_complete');
-    setIsLoggedIn(false);
-    setNeedsOnboarding(false);
-    setActiveTool(Tool.DASHBOARD);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setActiveTool(Tool.DASHBOARD);
+      setNeedsOnboarding(false);
+    } catch (error) {
+      showToast("Logout failed. Please try again.", "error");
+    }
   };
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
@@ -111,30 +106,43 @@ const App: React.FC = () => {
   }, []);
 
   const renderActiveTool = useCallback(() => {
+    if (!user) return <Dashboard onNavigate={setActiveTool} />;
+
     switch (activeTool) {
       case Tool.DASHBOARD: return <Dashboard onNavigate={setActiveTool} />;
       case Tool.ADVISOR: return <BusinessAdvisor />;
       case Tool.INVOICE: return <InvoiceGenerator showToast={showToast} />;
-      case Tool.TAX: return <TaxCalculator />;
-      case Tool.EXPENSES: return <ReceiptScanner />;
-      case Tool.MARKETING: return <MarketingAssistant />;
-      case Tool.PAYROLL: return <PayrollReminders />;
-      case Tool.CONTRACT: return <ContractAssistant />;
+      case Tool.TAX: return <TaxCalculator showToast={showToast} />;
+      case Tool.EXPENSES: return <ReceiptScanner showToast={showToast} />;
+      case Tool.MARKETING: return <MarketingAssistant showToast={showToast} />;
+      case Tool.PAYROLL: return <PayrollReminders showToast={showToast} />;
+      case Tool.CONTRACT: return <ContractAssistant showToast={showToast} />;
       case Tool.CLIENTS: return <ClientManager showToast={showToast} />;
-      case Tool.COMPANY_REGISTRATION: return <CompanyRegistration />;
-      case Tool.COMPLIANCE: return <ComplianceAssistant />;
-      case Tool.DIRECTOR_VERIFICATION: return <DirectorVerification />;
-      case Tool.USER_PROFILE: return <UserProfile />;
-      case Tool.SETTINGS: return <Settings />;
+      case Tool.COMPANY_REGISTRATION: return <CompanyRegistration showToast={showToast} />;
+      case Tool.COMPLIANCE: return <ComplianceAssistant showToast={showToast} />;
+      case Tool.DIRECTOR_VERIFICATION: return <DirectorVerification showToast={showToast} />;
+      case Tool.USER_PROFILE: return <UserProfile showToast={showToast} />;
+      case Tool.SETTINGS: return <Settings showToast={showToast} />;
       case Tool.ABOUT: return <About />;
       case Tool.CONTACT: return <Contact />;
       case Tool.HELP: return <HelpSupport />;
       default: return <Dashboard onNavigate={setActiveTool} />;
     }
-  }, [activeTool, showToast]);
+  }, [activeTool, showToast, user]);
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />;
+  if (!isAuthReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    if (showLogin) {
+      return <LoginPage onBack={() => setShowLogin(false)} />;
+    }
+    return <LandingPage onSignIn={() => setShowLogin(true)} />;
   }
 
   if (needsOnboarding) {
