@@ -7,7 +7,7 @@ import TextArea from './common/TextArea';
 import ConfirmModal from './common/ConfirmModal';
 import type { ToastType } from './common/Toast';
 
-type SettingTab = 'neural' | 'enterprise' | 'interface' | 'security';
+type SettingTab = 'neural' | 'enterprise' | 'interface' | 'security' | 'production';
 
 interface SettingsProps {
     showToast: (m: string, t: ToastType) => void;
@@ -131,6 +131,7 @@ const Settings: React.FC<SettingsProps> = ({ showToast }) => {
         { id: 'enterprise', label: 'Enterprise Defaults', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg> },
         { id: 'interface', label: 'Interface Specs', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg> },
         { id: 'security', label: 'Data Sovereignty', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 20.417l5.318 2.074a1.5 1.5 0 001.364 0l5.318-2.074a12.02 12.02 0 005.618-14.377z" /></svg> },
+        { id: 'production', label: 'Live Production', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-7.714 2.143L11 21l-2.286-6.857L1 12l7.714-2.143L11 3z" /></svg> },
     ];
 
     return (
@@ -394,6 +395,52 @@ const Settings: React.FC<SettingsProps> = ({ showToast }) => {
                                             "This command will permanently eliminate your digital footprint on this device. All local caches will be destroyed. This action is compliant with POPIA right-to-be-forgotten mandates."
                                         </p>
                                         <Button variant="danger" onClick={clearTelemetry} className="w-full !rounded-2xl !py-5 font-black uppercase tracking-[0.3em] text-xs shadow-2xl shadow-rose-100">Initialize Data Purge</Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+
+                    {activeTab === 'production' && (
+                        <div className="space-y-8 animate-soft-reveal">
+                            <Card title="Live Production Readiness" className="!p-10 !rounded-[2.5rem] shadow-2xl border-0">
+                                <div className="space-y-8">
+                                    <div className="p-6 bg-indigo-900 rounded-3xl text-white relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-6 opacity-10">
+                                            <svg width="100" height="100" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-7.714 2.143L11 21l-2.286-6.857L1 12l7.714-2.143L11 3z"/></svg>
+                                        </div>
+                                        <h4 className="text-lg font-black tracking-tight mb-2">Production Environment: smepal.edgtec.co.za</h4>
+                                        <p className="text-xs text-indigo-200 font-medium leading-relaxed italic">"Ensure all neural nodes are correctly configured for live enterprise traffic."</p>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Critical Deployment Checklist</h5>
+                                        <div className="space-y-4">
+                                            {[
+                                                { title: 'Vercel Environment Variables', desc: 'Ensure GEMINI_API_KEY and VITE_FIREBASE_* variables are set in your Vercel dashboard.', status: 'Action Required' },
+                                                { title: 'OAuth Authorized Domains', desc: 'Add smepal.edgtec.co.za to the "Authorized domains" list in Firebase Console > Auth > Settings.', status: 'Action Required' },
+                                                { title: 'Real Payment Integration', desc: 'The current payment module is in simulation mode. Integrate Paystack or Stripe for live transactions.', status: 'Pending' },
+                                                { title: 'SEO & Analytics Verification', desc: 'Verify OpenGraph meta tags and update the Google Analytics ID in index.html.', status: 'In Progress' },
+                                                { title: 'POPIA & Legal Compliance', desc: 'Review the Terms and Privacy Policy in StaticPage.tsx to ensure they match your legal entity.', status: 'Verify' }
+                                            ].map((item, i) => (
+                                                <div key={i} className="flex items-start gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                                                    <div className="h-5 w-5 rounded-full border-2 border-indigo-200 flex-shrink-0 mt-0.5"></div>
+                                                    <div>
+                                                        <div className="flex items-center gap-3 mb-1">
+                                                            <h6 className="text-sm font-black text-slate-800">{item.title}</h6>
+                                                            <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full tracking-widest">{item.status}</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-8 border-t border-slate-50">
+                                        <Button variant="primary" className="w-full !py-4 shadow-xl shadow-indigo-100 !rounded-2xl">
+                                            Download Production Config Guide
+                                        </Button>
                                     </div>
                                 </div>
                             </Card>

@@ -1,11 +1,22 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, GithubAuthProvider, OAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, addDoc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from './firebase-applet-config.json';
+import firebaseConfigJson from './firebase-applet-config.json';
+
+// Support environment variables for production deployment (e.g. Vercel)
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfigJson.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfigJson.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigJson.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfigJson.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfigJson.appId,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId
+};
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const githubProvider = new GithubAuthProvider();
@@ -109,6 +120,28 @@ export const getUserProfile = async (userId: string) => {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
     return userDoc.exists() ? userDoc.data() : null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+};
+
+export const saveCompanyRegistration = async (userId: string, data: any) => {
+  const path = `users/${userId}/registrations/current`;
+  try {
+    await setDoc(doc(db, 'users', userId, 'registrations', 'current'), {
+      ...data,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+};
+
+export const getCompanyRegistration = async (userId: string) => {
+  const path = `users/${userId}/registrations/current`;
+  try {
+    const regDoc = await getDoc(doc(db, 'users', userId, 'registrations', 'current'));
+    return regDoc.exists() ? regDoc.data() : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, path);
   }

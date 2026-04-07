@@ -442,3 +442,43 @@ export const getDailyBusinessTip = async (): Promise<string> => {
         return "Consistency is key to business growth. Review your goals daily.";
     }
 };
+
+export const getComplianceReadinessCheck = async (formData: any): Promise<{ score: number; feedback: string }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const prompt = `
+Act as a CIPC and SARS compliance auditor for South African company registrations.
+Review the following company registration data and provide a "Readiness Score" (0-100) and detailed feedback.
+Focus on:
+1.  Completeness of names.
+2.  Director information (at least one director for a Private Company).
+3.  Address completeness.
+4.  Potential issues with the proposed names (e.g., too generic, offensive, or likely to be rejected by CIPC).
+
+Data:
+${JSON.stringify(formData, null, 2)}
+
+Return a JSON object with 'score' (number) and 'feedback' (string, use markdown for formatting).
+`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: PRO_MODEL,
+            contents: prompt,
+            config: {
+                thinkingConfig: { thinkingBudget: 1500 },
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        score: { type: Type.NUMBER },
+                        feedback: { type: Type.STRING }
+                    }
+                }
+            }
+        });
+        return JSON.parse(response.text.trim());
+    } catch (error) {
+        console.error("Error getting readiness check:", error);
+        throw new Error("Failed to get compliance readiness check.");
+    }
+};

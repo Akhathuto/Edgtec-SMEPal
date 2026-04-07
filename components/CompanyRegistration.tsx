@@ -7,10 +7,12 @@ import FileUpload from './common/FileUpload';
 import Tooltip from './common/Tooltip';
 import ConfirmModal from './common/ConfirmModal';
 import type { ToastType } from './common/Toast';
-import { suggestCompanyNames } from '../services/geminiService';
+import { suggestCompanyNames, getComplianceReadinessCheck } from '../services/geminiService';
 import { CompanyRegistrationData, Director, CompanyType } from '../types';
 import { validateIdNumber, validatePaymentDetails } from '../utils/validation';
 import type { PaymentValidationErrors } from '../utils/validation';
+import { auth, saveCompanyRegistration, getCompanyRegistration } from '../firebase';
+import { CheckCircle2, AlertCircle, Info, Save, ArrowRight, ArrowLeft, ShieldCheck, FileText, UserCheck, CreditCard, Building2, Scale, RefreshCw } from 'lucide-react';
 
 
 const DirectorForm: React.FC<{ director: Director; onUpdate: (director: Director) => void; onRemove: (id: string) => void; index: number }> = ({ director, onUpdate, onRemove, index }) => {
@@ -159,6 +161,9 @@ const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) 
     const [paymentErrors, setPaymentErrors] = useState<PaymentValidationErrors>({});
     const [isPaying, setIsPaying] = useState(false);
     const [transactionId, setTransactionId] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [readinessCheck, setReadinessCheck] = useState<{ score: number; feedback: string } | null>(null);
+    const [isCheckingReadiness, setIsCheckingReadiness] = useState(false);
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -175,35 +180,84 @@ const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) 
 
 
     useEffect(() => {
-        try {
-            const savedData = localStorage.getItem(STORAGE_KEY);
-            if (savedData) {
-                const parsed = JSON.parse(savedData);
-                setFormData(prev => ({
-                    ...prev,
-                    ...parsed.formData,
-                    directorIdDocuments: {},
-                    businessAddressProof: null
-                }));
-                if (parsed.step < 8) {
-                    setStep(parsed.step);
+        const loadProgress = async () => {
+            const userId = auth.currentUser?.uid;
+            
+            // Try Firestore first
+            if (userId) {
+                try {
+                    const firestoreData = await getCompanyRegistration(userId);
+                    if (firestoreData) {
+                        setFormData(prev => ({
+                            ...prev,
+                            ...firestoreData.formData,
+                            directorIdDocuments: {},
+                            businessAddressProof: null
+                        }));
+                        if (firestoreData.step < 8) {
+                            setStep(firestoreData.step);
+                        }
+                        return; // Successfully loaded from Firestore
+                    }
+                } catch (e) {
+                    console.error("Failed to load from Firestore", e);
                 }
             }
-        } catch (e) {
-            console.error("Failed to load saved registration progress", e);
-        }
+
+            // Fallback to LocalStorage
+            try {
+                const savedData = localStorage.getItem(STORAGE_KEY);
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    setFormData(prev => ({
+                        ...prev,
+                        ...parsed.formData,
+                        directorIdDocuments: {},
+                        businessAddressProof: null
+                    }));
+                    if (parsed.step < 8) {
+                        setStep(parsed.step);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load saved registration progress", e);
+            }
+        };
+
+        loadProgress();
     }, []);
 
-    useEffect(() => {
+    const saveProgress = async (currentStep: number, currentData: CompanyRegistrationData) => {
+        const userId = auth.currentUser?.uid;
         const dataToSave = {
-            step,
+            step: currentStep,
             formData: {
-                ...formData,
+                ...currentData,
                 directorIdDocuments: {},
                 businessAddressProof: null
             }
         };
+
+        // Always save to LocalStorage
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+
+        // Save to Firestore if logged in
+        if (userId) {
+            setIsSaving(true);
+            try {
+                await saveCompanyRegistration(userId, dataToSave);
+            } catch (e) {
+                console.error("Failed to save to Firestore", e);
+            } finally {
+                setIsSaving(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (step > 0 && step < 8) {
+            saveProgress(step, formData);
+        }
     }, [step, formData]);
 
 
@@ -319,6 +373,25 @@ const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) 
         else if (!names.name4) newNames.name4 = name;
         else newNames.name4 = name;
         setFormData(prev => ({ ...prev, names: newNames }));
+        showToast(`"${name}" added to proposed names.`, "success");
+    };
+
+    const handleReadinessCheck = async () => {
+        setIsCheckingReadiness(true);
+        try {
+            const result = await getComplianceReadinessCheck(formData);
+            setReadinessCheck(result);
+            showToast("Compliance audit complete.", "success");
+        } catch (err: any) {
+            showToast(err.message || "Failed to perform readiness check.", "error");
+        } finally {
+            setIsCheckingReadiness(false);
+        }
+    };
+
+    const handleSaveAndExit = async () => {
+        await saveProgress(step, formData);
+        showToast("Progress saved securely. You can return anytime.", "success");
     };
     
     const copyBusinessAddress = () => {
@@ -376,6 +449,19 @@ const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) 
     };
 
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+
+    const isStepValid = (currentStep: number) => {
+        switch (currentStep) {
+            case 1: return formData.names.name1.trim().length > 0;
+            case 2: return formData.businessPhysicalAddress.trim().length > 0 && formData.businessPostalAddress.trim().length > 0;
+            case 3: return formData.directors.length > 0 && formData.directors.every(d => d.fullName && d.identificationNumber && d.email);
+            case 4: return !!formData.businessAddressProof && formData.directors.every(d => !!formData.directorIdDocuments[d.id]);
+            case 5: return formData.primaryContact.name.trim().length > 0 && formData.primaryContact.email.trim().length > 0;
+            case 6: return true;
+            case 7: return paymentDetails.cardholderName && paymentDetails.cardNumber && paymentDetails.expiryDate && paymentDetails.cvc;
+            default: return true;
+        }
+    };
     
     const submitRegistrationData = () => {
         for (const director of formData.directors) {
@@ -558,38 +644,100 @@ const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) 
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-10 pb-24 animate-fade-in">
-            <div className="text-center space-y-2">
-                 <h1 className="text-4xl font-black text-slate-900 tracking-tight">Registration Wizard</h1>
-                 <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Active Session: <span className="text-indigo-600">{formData.companyType}</span></p>
-            </div>
-            
-            <div className="bg-white/80 backdrop-blur-md border border-slate-100 rounded-[2.5rem] p-8 sm:p-10 shadow-xl overflow-hidden">
-                <nav aria-label="Progress">
-                    <ol role="list" className="flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide pb-4">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 pb-24 animate-fade-in">
+            {/* Left Sidebar - Progress & Help */}
+            <div className="lg:col-span-3 space-y-8">
+                <div className="bg-white/80 backdrop-blur-md border border-slate-100 rounded-[2.5rem] p-8 shadow-xl sticky top-8">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="h-10 w-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                            <Building2 className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="font-black text-slate-900 tracking-tight">Registration</h2>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Wizard v2.0</p>
+                        </div>
+                    </div>
+
+                    <nav aria-label="Progress" className="space-y-4">
                         {steps.map((s, index) => (
-                            <li key={s.name} className="flex-shrink-0 flex flex-col items-center gap-3">
-                                {step > s.id ? (
-                                    <button onClick={() => setStep(s.id)} className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.052-.143z" clipRule="evenodd" /></svg>
-                                    </button>
-                                ) : step === s.id ? (
-                                    <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-indigo-600 bg-white ring-4 ring-indigo-50" aria-current="step">
-                                        <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
-                                    </div>
-                                ) : (
-                                    <div className="group relative flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-slate-100 bg-slate-50/50">
-                                        <span className="text-[10px] font-black text-slate-300">{s.id}</span>
-                                    </div>
-                                )}
-                                <span className={`text-[9px] font-black uppercase tracking-widest text-center whitespace-nowrap ${step === s.id ? 'text-indigo-600' : 'text-slate-400 opacity-60'}`}>{s.name}</span>
-                            </li>
+                            <div key={s.name} className="flex items-center gap-4 group">
+                                <div className="relative flex flex-col items-center">
+                                    {step > s.id ? (
+                                        <div className="h-6 w-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-100">
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                        </div>
+                                    ) : step === s.id ? (
+                                        <div className="h-6 w-6 rounded-lg border-2 border-indigo-600 bg-white flex items-center justify-center ring-4 ring-indigo-50">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
+                                        </div>
+                                    ) : (
+                                        <div className="h-6 w-6 rounded-lg border-2 border-slate-100 bg-slate-50/50 flex items-center justify-center">
+                                            <span className="text-[8px] font-black text-slate-300">{s.id}</span>
+                                        </div>
+                                    )}
+                                    {index < steps.length - 1 && (
+                                        <div className={`w-0.5 h-6 my-1 ${step > s.id ? 'bg-emerald-200' : 'bg-slate-100'}`} />
+                                    )}
+                                </div>
+                                <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${step === s.id ? 'text-indigo-600' : step > s.id ? 'text-slate-600' : 'text-slate-300'}`}>
+                                    {s.name}
+                                </span>
+                            </div>
                         ))}
-                    </ol>
-                </nav>
+                    </nav>
+
+                    <div className="mt-10 pt-8 border-t border-slate-50 space-y-4">
+                        <Button 
+                            variant="ghost" 
+                            onClick={handleSaveAndExit} 
+                            isLoading={isSaving}
+                            className="w-full !justify-start gap-3 text-slate-500 hover:text-indigo-600 !px-4"
+                        >
+                            <Save className="h-4 w-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Save & Exit</span>
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            onClick={resetWizard} 
+                            className="w-full !justify-start gap-3 text-slate-400 hover:text-rose-600 !px-4"
+                        >
+                            <RefreshCw className="h-4 w-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Reset Wizard</span>
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Contextual Help */}
+                <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group hidden lg:block">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-16 -mt-16"></div>
+                    <div className="relative z-10 space-y-4">
+                        <div className="h-8 w-8 bg-white/10 rounded-xl flex items-center justify-center">
+                            <Info className="h-4 w-4 text-indigo-300" />
+                        </div>
+                        <h4 className="font-black text-xs uppercase tracking-widest text-indigo-200">Pro Tip</h4>
+                        <p className="text-xs text-indigo-100/80 leading-relaxed font-medium italic">
+                            {step === 1 && "CIPC name reservations can take 2-3 business days. Choose unique names to avoid rejection."}
+                            {step === 2 && "Your registered office is where official legal documents will be served. It must be a physical street address."}
+                            {step === 3 && "Private companies (Pty Ltd) need at least 1 director. NPCs need at least 3. Ensure ID numbers are accurate."}
+                            {step === 4 && "Certified documents must not be older than 3 months. Use a clear scan to avoid processing delays."}
+                            {step >= 5 && "The primary liaison will receive all CIPC correspondence. Use an email address you check frequently."}
+                        </p>
+                    </div>
+                </div>
             </div>
-            
-            <div className="space-y-10">
+
+            {/* Main Content */}
+            <div className="lg:col-span-9 space-y-10">
+                <div className="text-left space-y-2">
+                     <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+                        {steps.find(s => s.id === step)?.name || 'Registration Wizard'}
+                     </h1>
+                     <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">
+                        Entity Type: <span className="text-indigo-600">{formData.companyType}</span>
+                     </p>
+                </div>
+                
+                <div className="space-y-10">
                 {step === 1 && (
                     <div className="space-y-10">
                         <Card title="Proposed Company Names" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
@@ -784,21 +932,60 @@ const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) 
 
                 {step === 6 && (
                     <Card title="Audit Review" className="!rounded-[3rem] !p-10 shadow-2xl border-0">
-                        <div className="text-left space-y-4">
-                            <div className="bg-emerald-50 p-6 rounded-[1.5rem] border border-emerald-100 flex items-center gap-4 mb-8 animate-pulse">
-                                <div className="h-4 w-4 bg-emerald-500 rounded-full"></div>
-                                <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em]">Engine Scan: System Data Consistent</p>
+                        <div className="text-left space-y-8">
+                            <div className="flex flex-col md:flex-row gap-8 items-start">
+                                <div className="flex-1 space-y-4">
+                                    <div className="bg-emerald-50 p-6 rounded-[1.5rem] border border-emerald-100 flex items-center gap-4 mb-4">
+                                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                        <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em]">Engine Scan: System Data Consistent</p>
+                                    </div>
+                                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                                        Our AI engine has performed a preliminary scan of your application. For a deeper compliance audit, use the Neural Readiness Check.
+                                    </p>
+                                </div>
+                                <div className="w-full md:w-72">
+                                    <Button 
+                                        onClick={handleReadinessCheck} 
+                                        isLoading={isCheckingReadiness}
+                                        variant="secondary"
+                                        className="w-full !py-6 !rounded-2xl border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                                    >
+                                        <ShieldCheck className="h-5 w-5 mr-2" />
+                                        Neural Readiness Check
+                                    </Button>
+                                </div>
                             </div>
+
+                            {readinessCheck && (
+                                <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white animate-fade-in-up relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-8">
+                                        <div className="h-20 w-20 rounded-full border-4 border-indigo-500/30 flex items-center justify-center relative">
+                                            <span className="text-2xl font-black">{readinessCheck.score}</span>
+                                            <div className="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin-slow" style={{ clipPath: `inset(0 ${100 - readinessCheck.score}% 0 0)` }}></div>
+                                        </div>
+                                    </div>
+                                    <div className="relative z-10 max-w-xl">
+                                        <h4 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Compliance Audit Result</h4>
+                                        <div className="prose prose-invert prose-sm max-w-none">
+                                            <div className="text-indigo-100/90 font-medium leading-relaxed whitespace-pre-wrap">
+                                                {readinessCheck.feedback}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             
-                            <ReviewSection title="Identity Profiles" data={[
-                                { label: 'Selected Structure', value: formData.companyType },
-                                { label: 'Primary Entity Name', value: formData.names.name1 }, 
-                                { label: 'Backup Identification', value: formData.names.name2 || 'None' }
-                            ]} />
-                             <ReviewSection title="Physical Location" data={[
-                                { label: 'Business Hub', value: formData.businessPhysicalAddress }, 
-                                { label: 'Fiscal Close', value: formData.yearEnd }
-                            ]} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12">
+                                <ReviewSection title="Identity Profiles" data={[
+                                    { label: 'Selected Structure', value: formData.companyType },
+                                    { label: 'Primary Entity Name', value: formData.names.name1 }, 
+                                    { label: 'Backup Identification', value: formData.names.name2 || 'None' }
+                                ]} />
+                                <ReviewSection title="Physical Location" data={[
+                                    { label: 'Business Hub', value: formData.businessPhysicalAddress }, 
+                                    { label: 'Fiscal Close', value: formData.yearEnd }
+                                ]} />
+                            </div>
                             {formData.directors.map((dir, i) => (
                                 <ReviewSection key={dir.id} title={`Board Director ${i+1}`} data={[
                                     { label: 'Identified As', value: dir.fullName }, 
@@ -904,21 +1091,65 @@ const CompanyRegistration: React.FC<CompanyRegistrationProps> = ({ showToast }) 
                 )}
                 
                 {step < 8 && (
-                    <div className="flex justify-between items-center pt-10">
+                    <div className="flex justify-between items-center pt-10 border-t border-slate-100">
                         <div className="flex gap-4">
-                            {step > 1 && (<Button type="button" variant="secondary" onClick={prevStep} disabled={isPaying} className="!rounded-xl px-8 !py-3">Back</Button>)}
-                            {step === 1 && (<Button type="button" variant="secondary" onClick={() => setStep(0)} className="!rounded-xl px-8 !py-3">Change Type</Button>)}
-                            {step > 0 && <Button type="button" variant="ghost" onClick={resetWizard} className="!text-rose-500 font-black uppercase tracking-widest text-[10px] hover:bg-rose-50 rounded-xl px-4 transition-all">Emergency Reset</Button>}
+                            {step > 1 && (
+                                <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    onClick={prevStep} 
+                                    disabled={isPaying} 
+                                    className="!px-8 !py-4 text-slate-400 hover:text-indigo-600"
+                                >
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                    Back
+                                </Button>
+                            )}
+                            {step === 1 && (
+                                <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    onClick={() => setStep(0)} 
+                                    className="!px-8 !py-4 text-slate-400 hover:text-indigo-600"
+                                >
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                    Change Type
+                                </Button>
+                            )}
                         </div>
-                        <div>
-                            {step < 6 && (<Button type="button" onClick={nextStep} className="shadow-xl shadow-indigo-100 !rounded-xl px-12 !py-4">Continue Journey</Button>)}
-                            {step === 6 && (<Button type="button" onClick={nextStep} className="shadow-2xl shadow-indigo-200 !rounded-xl px-12 !py-4 !bg-indigo-600">Confirm & Proceed to Payment</Button>)}
+                        <div className="flex items-center gap-4">
+                            {isSaving && (
+                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest animate-pulse">
+                                    Syncing...
+                                </span>
+                            )}
+                            {step < 6 && (
+                                <Button 
+                                    type="button" 
+                                    onClick={nextStep} 
+                                    className="shadow-xl shadow-indigo-100 !rounded-xl px-12 !py-4"
+                                >
+                                    Continue Journey
+                                    <ArrowRight className="h-4 w-4 ml-2" />
+                                </Button>
+                            )}
+                            {step === 6 && (
+                                <Button 
+                                    type="button" 
+                                    onClick={nextStep} 
+                                    className="shadow-2xl shadow-indigo-200 !rounded-xl px-12 !py-4 !bg-indigo-600"
+                                >
+                                    Confirm & Proceed to Payment
+                                    <ArrowRight className="h-4 w-4 ml-2" />
+                                </Button>
+                            )}
                         </div>
                     </div>
                 )}
             </div>
+        </div>
 
-            <ConfirmModal
+        <ConfirmModal
                 isOpen={confirmConfig.isOpen}
                 title={confirmConfig.title}
                 message={confirmConfig.message}
