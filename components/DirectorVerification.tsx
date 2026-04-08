@@ -6,7 +6,29 @@ import { validateIdNumber } from '../utils/validation';
 import { verifyDirectorDetails } from '../services/geminiService';
 import type { DirectorVerificationResult } from '../types';
 
-const ResultDisplay: React.FC<{ result: DirectorVerificationResult }> = ({ result }) => {
+// Helper to extract info from a valid SA ID
+const extractIdInfo = (idNumber: string) => {
+    if (idNumber.length !== 13) return null;
+    
+    const yearStr = idNumber.substring(0, 2);
+    const month = idNumber.substring(2, 4);
+    const day = idNumber.substring(4, 6);
+    const genderCode = parseInt(idNumber.substring(6, 10), 10);
+    const citizenshipCode = parseInt(idNumber.substring(10, 11), 10);
+
+    const currentYear = new Date().getFullYear();
+    const currentCentury = Math.floor(currentYear / 100);
+    const yearInt = parseInt(yearStr, 10);
+    const fullYear = yearInt > (currentYear % 100) ? (currentCentury - 1) * 100 + yearInt : currentCentury * 100 + yearInt;
+
+    return {
+        dob: `${fullYear}-${month}-${day}`,
+        gender: genderCode >= 5000 ? 'Male' : 'Female',
+        citizenship: citizenshipCode === 0 ? 'SA Citizen' : 'Permanent Resident'
+    };
+};
+
+const ResultDisplay: React.FC<{ result: DirectorVerificationResult, idInfo?: ReturnType<typeof extractIdInfo> }> = ({ result, idInfo }) => {
     const statusClasses = {
         'Verified': 'bg-green-100 text-green-800',
         'Attention Required': 'bg-yellow-100 text-yellow-800',
@@ -29,6 +51,26 @@ const ResultDisplay: React.FC<{ result: DirectorVerificationResult }> = ({ resul
                         <p className="text-sm">{result.message}</p>
                     </div>
                 </div>
+
+                {idInfo && result.status !== 'Invalid' && (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Extracted ID Data</h3>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <p className="text-[10px] text-slate-500 uppercase">Date of Birth</p>
+                                <p className="font-bold text-slate-800">{idInfo.dob}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-500 uppercase">Gender</p>
+                                <p className="font-bold text-slate-800">{idInfo.gender}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-500 uppercase">Status</p>
+                                <p className="font-bold text-slate-800">{idInfo.citizenship}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div>
                     <h3 className="text-md font-semibold text-gray-700">Recommended Next Steps</h3>
@@ -58,6 +100,7 @@ const DirectorVerification: React.FC = () => {
     const [idNumber, setIdNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<DirectorVerificationResult | null>(null);
+    const [idInfo, setIdInfo] = useState<ReturnType<typeof extractIdInfo> | undefined>(undefined);
     const [error, setError] = useState('');
     
     const handleSubmit = async (e: React.FormEvent) => {
@@ -65,12 +108,16 @@ const DirectorVerification: React.FC = () => {
         setLoading(true);
         setError('');
         setResult(null);
+        setIdInfo(undefined);
 
         const clientValidationError = validateIdNumber('SA ID', idNumber);
         
         try {
             const verificationResult = await verifyDirectorDetails(name, idNumber, clientValidationError);
             setResult(verificationResult);
+            if (!clientValidationError) {
+                setIdInfo(extractIdInfo(idNumber));
+            }
         } catch (err: any) {
             setError(err.message || "An unexpected error occurred.");
         } finally {
@@ -113,7 +160,7 @@ const DirectorVerification: React.FC = () => {
 
             {loading && <Card><div className="text-center text-slate-600 p-8">Analyzing details and generating report...</div></Card>}
             {error && <Card><div className="text-red-600 bg-red-100 p-4 rounded-md">{error}</div></Card>}
-            {result && <ResultDisplay result={result} />}
+            {result && <ResultDisplay result={result} idInfo={idInfo} />}
         </div>
     );
 };
