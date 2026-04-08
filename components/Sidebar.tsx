@@ -153,7 +153,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTool, onSelectTool, isOpen, set
              <div className="relative z-10">
                <p className="text-[10px] font-extrabold text-indigo-100 uppercase tracking-widest mb-1">Upgrade</p>
                <h4 className="text-white font-bold text-sm mb-4 leading-tight">Professional Tier</h4>
-               <button className="w-full bg-white text-indigo-600 py-2 rounded-lg text-[11px] font-extrabold hover:bg-slate-50 transition-colors shadow-sm">Go Unlimited</button>
+               <button 
+                 onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
+                 className="w-full bg-white text-indigo-600 py-2 rounded-lg text-[11px] font-extrabold hover:bg-slate-50 transition-colors shadow-sm"
+               >
+                 Go Unlimited
+               </button>
              </div>
            </div>
         </div>

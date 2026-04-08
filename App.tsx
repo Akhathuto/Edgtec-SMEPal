@@ -24,6 +24,7 @@ import DirectorVerification from './components/DirectorVerification';
 import ReceiptScanner from './components/ReceiptScanner';
 import MarketingAssistant from './components/MarketingAssistant';
 import Toast, { ToastType } from './components/common/Toast';
+import UpgradeModal from './components/common/UpgradeModal';
 import { auth, onAuthStateChanged, logout, User, db, doc, getDoc, getUserProfile } from './firebase';
 
 const App: React.FC = () => {
@@ -35,6 +36,7 @@ const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<Tool>(Tool.DASHBOARD);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: ToastType } | null>(null);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   
   // App Settings State
   const [appSettings, setAppSettings] = useState({
@@ -82,7 +84,14 @@ const App: React.FC = () => {
         if (updatedSettings) setAppSettings(JSON.parse(updatedSettings));
     };
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+
+    const handleOpenUpgrade = () => setIsUpgradeModalOpen(true);
+    window.addEventListener('open-upgrade-modal', handleOpenUpgrade);
+
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('open-upgrade-modal', handleOpenUpgrade);
+    };
   }, []);
 
   const handleOnboardingComplete = () => {
@@ -175,6 +184,7 @@ const App: React.FC = () => {
           {renderActiveTool()}
         </main>
       </div>
+      <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} />
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );

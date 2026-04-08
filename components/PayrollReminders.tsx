@@ -63,7 +63,12 @@ const PayrollReminders: React.FC = () => {
                     <h3 className="text-3xl font-black mb-4">Want Automated Reminders?</h3>
                     <p className="text-indigo-100 text-lg mb-8 max-w-md mx-auto">Our Professional Tier integrates directly with your Google or Outlook calendar to send you real-time push alerts.</p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Button className="!bg-white !text-indigo-700 hover:!bg-indigo-50 !py-4 px-10 shadow-2xl">Upgrade to Pro</Button>
+                        <Button 
+                            onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
+                            className="!bg-white !text-indigo-700 hover:!bg-indigo-50 !py-4 px-10 shadow-2xl"
+                        >
+                            Upgrade to Pro
+                        </Button>
                         <Button variant="ghost" className="!text-white border border-white/20 hover:!bg-white/10 !py-4 px-10">Export .ICS File</Button>
                     </div>
                 </div>

@@ -158,7 +158,15 @@ const STATIC_CONTENT: Record<StaticPageSlug, { title: string; subtitle: string; 
                   </li>
                 ))}
               </ul>
-              <Button variant={plan.popular ? 'primary' : 'secondary'} className="w-full !py-3 !text-xs">
+              <Button 
+                variant={plan.popular ? 'primary' : 'secondary'} 
+                className="w-full !py-3 !text-xs"
+                onClick={() => {
+                  if (plan.name === 'Professional') {
+                    window.dispatchEvent(new CustomEvent('open-upgrade-modal'));
+                  }
+                }}
+              >
                 {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
               </Button>
             </div>
