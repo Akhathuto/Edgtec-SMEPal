@@ -1,25 +1,41 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import Card from './common/Card';
 import Button from './common/Button';
 import { useClients } from '../hooks/useClients';
+import { useExpenses } from '../hooks/useExpenses';
 import { Tool, Expense } from '../types';
 import { getDailyBusinessTip } from '../services/geminiService';
+import { auth, getUserProfile } from '../firebase';
 
 interface DashboardProps {
     onNavigate: (tool: Tool) => void;
 }
 
-const Sparkline: React.FC<{ color: string }> = ({ color }) => (
-    <svg viewBox="0 0 100 30" className="h-10 w-full overflow-visible">
-        <path
-            d="M0 25 Q 10 5, 20 20 T 40 10 T 60 25 T 80 5 T 100 20"
-            fill="none"
-            stroke={color}
-            strokeWidth="2"
-            strokeLinecap="round"
-            className="animate-draw"
-        />
-    </svg>
+const generateMockData = () => {
+    const data = [];
+    let value = 1000;
+    for (let i = 0; i < 7; i++) {
+        value = value + (Math.random() * 500 - 200);
+        data.push({ day: `Day ${i+1}`, value: Math.max(0, value) });
+    }
+    return data;
+};
+
+const MiniChart: React.FC<{ color: string, data: any[] }> = ({ color, data }) => (
+    <div className="h-16 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data}>
+                <defs>
+                    <linearGradient id={`color-${color}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                    </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="value" stroke={color} fillOpacity={1} fill={`url(#color-${color})`} strokeWidth={2} isAnimationActive={true} />
+            </AreaChart>
+        </ResponsiveContainer>
+    </div>
 );
 
 const PulseWidget: React.FC = () => {
@@ -61,29 +77,23 @@ const PulseWidget: React.FC = () => {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const { clients } = useClients();
+    const { expenses } = useExpenses();
     const [dailyTip, setDailyTip] = useState<string | null>(null);
     const [loadingTip, setLoadingTip] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [userName, setUserName] = useState('Entrepreneur');
     const [businessSector, setBusinessSector] = useState('Growth');
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         
-        const storedExpenses = localStorage.getItem('sme-pal-expenses');
-        if (storedExpenses) setExpenses(JSON.parse(storedExpenses));
-        
-        const session = localStorage.getItem('smepal_session');
-        if (session) {
-            const parsed = JSON.parse(session);
-            setUserName(parsed.name?.split(' ')[0] || 'Entrepreneur');
-        }
-
-        const profile = localStorage.getItem('smepal_business_profile');
-        if (profile) {
-            const parsed = JSON.parse(profile);
-            setBusinessSector(parsed.businessSector || 'Growth');
+        if (auth.currentUser) {
+            setUserName(auth.currentUser.displayName?.split(' ')[0] || 'Entrepreneur');
+            getUserProfile(auth.currentUser.uid).then(profile => {
+                if (profile && profile.industry) {
+                    setBusinessSector(profile.industry);
+                }
+            });
         }
 
         return () => clearInterval(timer);
@@ -98,6 +108,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
     const projectedRevenue = useMemo(() => clients.length * 12500, [clients]);
     const cashFlowRatio = projectedRevenue > 0 ? (monthlySpend / projectedRevenue) * 100 : 0;
+
+    const revenueData = useMemo(() => generateMockData(), []);
+    const expenseData = useMemo(() => generateMockData(), []);
 
     const handleGetTip = async () => {
         setLoadingTip(true);
@@ -144,8 +157,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 {/* FINANCIAL ENGINE */}
                 <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card className="!p-8 bg-white border-0 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <div className="absolute bottom-0 left-0 right-0 h-16 opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity">
-                            <Sparkline color="#4f46e5" />
+                        <div className="absolute bottom-0 left-0 right-0 opacity-50 pointer-events-none transition-opacity">
+                            <MiniChart color="#4f46e5" data={revenueData} />
                         </div>
                         <div className="relative z-10 space-y-6">
                             <div className="flex justify-between items-start">
@@ -173,8 +186,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     </Card>
 
                     <Card className="!p-8 bg-white border-0 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <div className="absolute bottom-0 left-0 right-0 h-16 opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity">
-                            <Sparkline color="#f43f5e" />
+                        <div className="absolute bottom-0 left-0 right-0 opacity-50 pointer-events-none transition-opacity">
+                            <MiniChart color="#f43f5e" data={expenseData} />
                         </div>
                         <div className="relative z-10 space-y-6">
                             <div className="flex justify-between items-start">

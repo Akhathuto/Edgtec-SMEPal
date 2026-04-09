@@ -29,6 +29,7 @@ export interface InvoiceItem {
 export type InvoiceTheme = 'standard' | 'modern' | 'minimal' | 'bold';
 
 export interface InvoiceDetails {
+  id?: string;
   fromName: string;
   fromAddress: string;
   fromBusinessNumber?: string;
@@ -147,6 +148,7 @@ export interface Expense {
   merchant: string;
   date: string;
   amount: number;
+  taxAmount?: number;
   category: string;
   description?: string;
   createdAt?: string;

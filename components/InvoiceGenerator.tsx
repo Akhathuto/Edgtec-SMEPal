@@ -7,6 +7,7 @@ import Spinner from './common/Spinner';
 import { generateInvoiceHtml, getSmartInvoiceRecommendations } from '../services/geminiService';
 import type { InvoiceDetails, InvoiceItem, InvoiceTheme } from '../types';
 import { useClients } from '../hooks/useClients';
+import { useInvoices } from '../hooks/useInvoices';
 import type { ToastType } from './common/Toast';
 
 declare global {
@@ -17,8 +18,7 @@ declare global {
 }
 
 const STORAGE_KEYS = {
-    LAST_NUMBER: 'sme-pal-last-invoice-number',
-    HISTORY: 'sme-pal-invoice-history'
+    LAST_NUMBER: 'sme-pal-last-invoice-number'
 };
 
 const DEFAULT_INVOICE_NUMBER = 'INV-1001';
@@ -48,6 +48,9 @@ const THEMES: { id: InvoiceTheme; name: string; color: string }[] = [
 ];
 
 const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ showToast }) => {
+    const { invoices, saveInvoice, deleteInvoice } = useInvoices();
+    const { clients } = useClients();
+    
     const [details, setDetails] = useState<InvoiceDetails>(() => {
         const today = new Date();
         const dueDate = new Date();
@@ -78,23 +81,24 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ showToast }) => {
     const [recommendations, setRecommendations] = useState<{ suggestedItems: string[], pricingAdvice: string } | null>(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [generatedHtml, setGeneratedHtml] = useState('');
-    const [history, setHistory] = useState<InvoiceDetails[]>([]);
     const [showHistory, setShowHistory] = useState(false);
-    const { clients } = useClients();
 
     // Persistence & History
     useEffect(() => {
         const last = localStorage.getItem(STORAGE_KEYS.LAST_NUMBER);
         if (last) setDetails(prev => ({ ...prev, invoiceNumber: prev.invoiceNumber === DEFAULT_INVOICE_NUMBER ? getNextInvoiceNumber(last) : prev.invoiceNumber }));
-        
-        const storedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
-        if (storedHistory) setHistory(JSON.parse(storedHistory));
     }, []);
 
-    const saveToHistory = (item: InvoiceDetails) => {
-        const updated = [item, ...history.filter(h => h.invoiceNumber !== item.invoiceNumber)].slice(0, 10);
-        setHistory(updated);
-        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+    const saveToHistory = async (item: InvoiceDetails) => {
+        // Add required fields for Firestore schema
+        const invoiceToSave = {
+            ...item,
+            clientId: clients.find(c => c.name === item.toName)?.id || 'unknown',
+            clientName: item.toName || 'Unknown Client',
+            total: item.items.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0),
+            status: 'draft' as const
+        };
+        await saveInvoice(invoiceToSave);
     };
 
     const loadFromHistory = (item: InvoiceDetails) => {
@@ -380,19 +384,22 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ showToast }) => {
                             <h4 className="font-black text-slate-800 dark:text-white uppercase tracking-widest text-xs">Draft History</h4>
                             <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg></button>
                         </div>
-                        {history.length === 0 ? (
+                        {invoices.length === 0 ? (
                             <p className="text-xs text-slate-400 italic">No recent drafts found.</p>
                         ) : (
                             <div className="space-y-4">
-                                {history.map((h, i) => (
+                                {invoices.map((h, i) => (
                                     <div 
-                                        key={i} 
+                                        key={h.id || i} 
                                         onClick={() => loadFromHistory(h)}
                                         className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-white dark:hover:bg-slate-600 transition-all cursor-pointer group"
                                     >
                                         <div className="flex justify-between items-center mb-1">
                                             <span className="text-xs font-black text-slate-800 dark:text-white">{h.invoiceNumber}</span>
                                             <span className="text-[9px] font-bold text-slate-400 uppercase">{h.date}</span>
+                                            <button onClick={(e) => { e.stopPropagation(); if(h.id) deleteInvoice(h.id); }} className="text-slate-300 hover:text-rose-500 transition-colors ml-2">
+                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
                                         </div>
                                         <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase truncate">{h.toName || 'Unnamed Recipient'}</p>
                                         <p className="mt-2 text-xs font-black text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">Load Template →</p>

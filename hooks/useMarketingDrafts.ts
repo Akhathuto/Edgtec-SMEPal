@@ -47,6 +47,8 @@ export const useMarketingDrafts = () => {
         try {
             await setDoc(newDraftRef, {
                 ...draft,
+                title: draft.topic,
+                type: draft.platform,
                 createdAt: new Date().toISOString()
             });
         } catch (error) {

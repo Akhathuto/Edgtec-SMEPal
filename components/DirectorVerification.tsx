@@ -158,6 +158,30 @@ const DirectorVerification: React.FC = () => {
                 </form>
             </Card>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="bg-indigo-50 border-indigo-100">
+                    <h3 className="text-sm font-bold text-indigo-900 mb-2">Free Official CIPC Search</h3>
+                    <p className="text-xs text-indigo-700 mb-4 leading-relaxed">
+                        You can manually verify if a company or director is registered for free using the official government BizPortal.
+                    </p>
+                    <a 
+                        href="https://bizportal.gov.za/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                    >
+                        Open BizPortal <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    </a>
+                </Card>
+
+                <Card className="bg-slate-50 border-slate-200">
+                    <h3 className="text-sm font-bold text-slate-900 mb-2">How our free check works</h3>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                        Our system uses the <strong>Luhn Algorithm</strong> to instantly verify if an ID number is mathematically valid and extracts the embedded Date of Birth, Gender, and Citizenship status without any API costs.
+                    </p>
+                </Card>
+            </div>
+
             {loading && <Card><div className="text-center text-slate-600 p-8">Analyzing details and generating report...</div></Card>}
             {error && <Card><div className="text-red-600 bg-red-100 p-4 rounded-md">{error}</div></Card>}
             {result && <ResultDisplay result={result} idInfo={idInfo} />}

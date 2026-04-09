@@ -108,6 +108,28 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ showToast }) => {
         });
     };
 
+    const handleExportCSV = () => {
+        const headers = ["Date", "Merchant", "Category", "Amount", "Tax Amount"];
+        const rows = expenses.map(e => [
+            `"${e.date}"`,
+            `"${e.merchant.replace(/"/g, '""')}"`,
+            `"${e.category.replace(/"/g, '""')}"`,
+            `"${e.amount}"`,
+            `"${e.taxAmount || 0}"`
+        ].join(','));
+        
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `smepal_expenses_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Expenses exported to CSV.", "success");
+    };
+
     return (
         <div className="max-w-7xl mx-auto space-y-10 pb-16 animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-end gap-6">
@@ -116,6 +138,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ showToast }) => {
                     <p className="text-slate-500 font-medium italic">"Real-time OCR extraction for SARS-compliant records."</p>
                 </div>
                 <div className="flex gap-4">
+                     <Button variant="secondary" onClick={handleExportCSV} className="!rounded-xl px-5 border-slate-200" disabled={expenses.length === 0}>Export CSV</Button>
                      <div className="bg-indigo-600 px-8 py-4 rounded-[2rem] text-white shadow-xl shadow-indigo-100 flex flex-col items-center justify-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Total Deductibles</p>
                         <p className="text-2xl font-black">R {totalSpend.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
